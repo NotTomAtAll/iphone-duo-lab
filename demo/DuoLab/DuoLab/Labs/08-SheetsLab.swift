@@ -68,6 +68,13 @@ struct SheetsLabView: View {
 
     private var content: some View {
         NavigationStack {
+            Color.clear.frame(height: 0)
+                .task {
+                    // `-duolab.present 1` opens the presentation once, for captures.
+                    guard !isThumbnail, UserDefaults.standard.bool(forKey: "duolab.present") else { return }
+                    try? await Task.sleep(for: .milliseconds(600))
+                    present(1)
+                }
             VStack(spacing: 28) {
                 VStack(spacing: 8) {
                     Text(kindTitle).font(.largeTitle.bold())

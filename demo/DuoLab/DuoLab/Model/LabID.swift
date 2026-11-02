@@ -12,6 +12,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
     case sheets
     case hinge
     case antiPatterns = "antipatterns"
+    case continuity = "continuity"
+    case laptopPose = "laptop"
+    case motion = "motion"
+    case toasts = "toasts"
+    case twoPanes = "twopanes"
+    case keyboard = "keyboard"
+    case transitions = "transitions"
 
     var id: String { rawValue }
 
@@ -31,6 +38,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sheets: "Presentations"
         case .hinge: "Hinge effects"
         case .antiPatterns: "Pitfalls"
+        case .continuity: "Fold mid-task"
+        case .laptopPose: "Laptop pose"
+        case .motion: "Motion on fold"
+        case .toasts: "Toasts and banners"
+        case .twoPanes: "Two panes and drag"
+        case .keyboard: "Keyboard per pose"
+        case .transitions: "Transitions"
         }
     }
 
@@ -46,6 +60,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sheets: "Where do sheets, popovers and alerts appear?"
         case .hinge: "What can the fold angle bring to life?"
         case .antiPatterns: "What breaks first on a foldable, and how do you fix it?"
+        case .continuity: "I was in the middle of something and opened the phone. Did anything get lost?"
+        case .laptopPose: "Half open on a table: what goes in the top half and what in the bottom?"
+        case .motion: "Should the layout animate when I open the phone, and how much?"
+        case .toasts: "Where should a \u{201c}Saved\u{201d} message appear on each display and pose?"
+        case .twoPanes: "Can two screens live side by side, and can I drag between them?"
+        case .keyboard: "Where does the keyboard go, and what happens to what I was typing?"
+        case .transitions: "Which transitions feel right on a foldable, and which get in the way?"
         }
     }
 
@@ -61,6 +82,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sheets: "rectangle.bottomhalf.inset.filled"
         case .hinge: "book.pages"
         case .antiPatterns: "exclamationmark.triangle"
+        case .continuity: "arrow.triangle.2.circlepath"
+        case .laptopPose: "laptopcomputer"
+        case .motion: "wand.and.sparkles"
+        case .toasts: "text.bubble"
+        case .twoPanes: "rectangle.split.2x1"
+        case .keyboard: "keyboard"
+        case .transitions: "arrow.up.left.and.arrow.down.right"
         }
     }
 
@@ -76,6 +104,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sheets: ["F-6b"]
         case .hinge: ["F-3d"]
         case .antiPatterns: ["F-2e", "F-3f", "F-3g", "D10", "R-§1"]
+        case .continuity: []
+        case .laptopPose: []
+        case .motion: []
+        case .toasts: []
+        case .twoPanes: []
+        case .keyboard: []
+        case .transitions: []
         }
     }
 
@@ -91,6 +126,13 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sheets: SheetsLab.knobs
         case .hinge: HingeLab.knobs
         case .antiPatterns: AntiPatternsLab.knobs
+        case .continuity: ContinuityLab.knobs
+        case .laptopPose: LaptopPoseLab.knobs
+        case .motion: MotionLab.knobs
+        case .toasts: ToastsLab.knobs
+        case .twoPanes: TwoPanesLab.knobs
+        case .keyboard: KeyboardLab.knobs
+        case .transitions: TransitionsLab.knobs
         }
     }
 }

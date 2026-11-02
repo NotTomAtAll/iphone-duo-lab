@@ -10,13 +10,13 @@ struct TopicsView: View {
         NavigationStack(path: $router.path) {
             List {
                 Section {
-                    Text("Ten layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
+                    Text("Fourteen layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
                 }
                 Section {
-                    ForEach(LabID.allCases) { lab in
+                    ForEach(LabID.allCases.filter { $0.options.first?.id != "placeholder" }) { lab in
                         NavigationLink(value: lab) { TopicRow(lab: lab) }
                     }
                 }

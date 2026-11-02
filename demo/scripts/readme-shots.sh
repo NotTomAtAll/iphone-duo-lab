@@ -31,15 +31,19 @@ SHOT=(
   reading       "-topic reading -option column"
   media         "-topic media -option arrangement-split"
   overlays      "-topic overlays -option fold-aware"
-  sheets        "-topic sheets -option sheet-form"
+  sheets        "-topic sheets -option sheet-form -duolab.present 1"
   hinge         "-topic hinge -option book"
   pitfalls      "-topic antipatterns -option screen-size"
+  continuity    "-topic continuity -option above"
+  laptop        "-topic laptop -option overlay -knob.simulatedPose laptop"
+  motion        "-topic motion -option mode"
+  toasts        "-topic toasts -option pill -duolab.pinToast 1"
   topic-page    "-topic grids"
 )
-ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls device)
+ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts device)
 NAMES=(${=SHOTS:-$ORDER})
 
-launch() { xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 ${=1} >/dev/null; sleep $WAIT; }
+launch() { xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 -duolab.hideBar 1 ${=1} >/dev/null; sleep $WAIT; }
 
 for pose in open closed; do
   rocketsim duo pose $pose --udid "$UDID" >/dev/null; sleep 2

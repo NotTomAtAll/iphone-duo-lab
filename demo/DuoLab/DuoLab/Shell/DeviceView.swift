@@ -4,6 +4,7 @@ import SwiftUI
 struct DeviceView: View {
     @State private var hinge = HingeReading.unknown
     @Environment(AppRouter.self) private var router
+    @AppStorage(ReachOverlay.storageKey) private var showsReach = false
 
     var body: some View {
         @Bindable var router = router
@@ -28,6 +29,8 @@ struct DeviceView: View {
                         .padding(16)
                         .card()
                         .frame(maxWidth: 520)
+                        reachCard(snapshot)
+                            .frame(maxWidth: 520)
                     }
                     .padding(20)
                 }
@@ -75,6 +78,26 @@ struct DeviceView: View {
                 }
             }
             Text("For effects only. Layout should never depend on the angle.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private func reachCard(_ s: EnvironmentSnapshot) -> some View {
+        InfoCard(title: "Reach", symbol: "hand.point.up.left") {
+            Toggle("Show thumb reach zones everywhere", isOn: $showsReach)
+            HStack(spacing: 8) {
+                ForEach(ReachOverlay.Band.allCases, id: \.self) { band in
+                    HStack(spacing: 4) {
+                        Circle().fill(band.color).frame(width: 8, height: 8)
+                        Text(band.title).font(.caption.weight(.medium))
+                    }
+                }
+            }
+            Text(s.horizontal == .regular
+                 ? "Open: two thumbs, one from each bottom corner. The middle of the top edge is hard, and the fold is hard when the device is part open."
+                 : "Folded: one right thumb from the bottom-trailing corner. The top-leading corner is hard.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Text("Our model, not measured. Bands are fixed thumb radii (\(Int(ReachOverlay.easyRadius)) and \(Int(ReachOverlay.stretchRadius)) pt); the side column is left clear.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }

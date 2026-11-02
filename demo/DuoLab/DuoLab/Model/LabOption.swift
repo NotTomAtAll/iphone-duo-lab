@@ -79,6 +79,13 @@ extension LabID {
         case .sheets: SheetsLab.options
         case .hinge: HingeLab.options
         case .antiPatterns: AntiPatternsLab.options
+        case .continuity: ContinuityLab.options
+        case .laptopPose: LaptopPoseLab.options
+        case .motion: MotionLab.options
+        case .toasts: ToastsLab.options
+        case .twoPanes: TwoPanesLab.options
+        case .keyboard: KeyboardLab.options
+        case .transitions: TransitionsLab.options
         }
     }
 
@@ -102,6 +109,13 @@ extension LabID {
         case .sheets: "Sheets, alerts and menus find a spot clear of the fold and the cameras on their own."
         case .hinge: "Use the hinge angle for delightful effects, never to decide the layout."
         case .antiPatterns: "Base layout on the space you actually have, never on the screen size, orientation or values saved at launch."
+        case .continuity: "Keep functionality and the state of every element the same between displays. People open and close the device often."
+        case .laptopPose: "When the device is half open on a surface, put media at the top and tappable controls at the bottom, and keep the same controls in every pose."
+        case .motion: "Animate the switch between layouts, not every frame of the resize. Respect Reduce Motion."
+        case .toasts: "Apple ships no toast. Prefer showing the change itself; a short message belongs in the pane the action came from, clear of the fold and the side rail."
+        case .twoPanes: "Use the extra space for a second level of hierarchy or a companion pane, and let people move things between the two halves."
+        case .keyboard: "Keep the field you are typing in visible above the keyboard in every pose, and keep the keyboard up across a fold."
+        case .transitions: "Use the system transitions: zoom from the thing you tapped, and plain pushes. Keep them short on the big display."
         }
     }
 
@@ -117,6 +131,13 @@ extension LabID {
         case .sheets: "Presentations"
         case .hinge: "Hinge"
         case .antiPatterns: "Pitfalls"
+        case .continuity: "Continuity"
+        case .laptopPose: "Laptop pose"
+        case .motion: "Motion"
+        case .toasts: "Toasts"
+        case .twoPanes: "Two panes"
+        case .keyboard: "Keyboard"
+        case .transitions: "Transitions"
         }
     }
 }

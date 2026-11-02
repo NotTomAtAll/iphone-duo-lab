@@ -3,6 +3,7 @@ import SwiftUI
 /// An option running live and full screen, with a floating glass bar you can drag anywhere.
 struct PreviewScreen: View {
     let lab: LabID
+    @AppStorage(ReachOverlay.storageKey) private var showsReach = false
     let entrance: PreviewEntrance
     /// The option whose card was tapped; the zoom always returns to that card.
     let openedIndex: Int
@@ -62,14 +63,21 @@ struct PreviewScreen: View {
                 .scaleEffect(fades && !settled ? 0.97 : 1)
         }
         .overlay {
+            // Reach bands sit under the floating bar, so the bar stays readable.
+            if showsReach { ReachOverlay() }
+        }
+        .overlay {
+            // `-duolab.hideBar 1` hides the lab controls for clean captures.
+            if !UserDefaults.standard.bool(forKey: "duolab.hideBar") {
             FloatingBar {
                 OptionBarContent(lab: lab, option: option, index: index, state: state,
                                  onClose: close, onStep: step, onInfo: { showsInfo = true })
             }
             .animation(speed) { $0.opacity(settled ? 1 : 0) }
+            }
         }
         .sheet(isPresented: $showsInfo) { OptionInfoSheet(lab: lab, option: option, state: state) }
-        .duoChrome()
+        .duoChrome(includesReach: false)
         .task {
             guard !settled else { return }
             // Zoom: let the morph finish on the picture. Fade: wait one layout pass.
@@ -170,6 +178,7 @@ struct OptionBarContent: View {
     var onClose: () -> Void
     var onStep: (Int) -> Void
     var onInfo: () -> Void
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         VStack(spacing: 8) {
@@ -195,7 +204,7 @@ struct OptionBarContent: View {
                         .font(.caption2)
                         .foregroundStyle(option.verdict.color)
                 }
-                .frame(maxWidth: 200)
+                .frame(maxWidth: sizeClass == .regular ? 340 : 200)
                 Button("Next", systemImage: "chevron.right") { onStep(1) }
                     .frame(width: 34, height: 44)
                 Button("About this option", systemImage: "info.circle", action: onInfo)
@@ -337,6 +346,13 @@ struct LabContent: View {
         case .sheets: SheetsLabView(state: state)
         case .hinge: HingeLabView(state: state)
         case .antiPatterns: AntiPatternsLabView(state: state)
+        case .continuity: ContinuityLabView(state: state)
+        case .laptopPose: LaptopPoseLabView(state: state)
+        case .motion: MotionLabView(state: state)
+        case .toasts: ToastsLabView(state: state)
+        case .twoPanes: TwoPanesLabView(state: state)
+        case .keyboard: KeyboardLabView(state: state)
+        case .transitions: TransitionsLabView(state: state)
         }
     }
 }

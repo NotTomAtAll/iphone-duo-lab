@@ -23,18 +23,24 @@ The thumbnails are rendered in hidden windows behind the app, in light and dark 
 
 | # | Topic | Options |
 |---|---|---|
-| 01 | Tab bar | Native tab bar ✓ · Sidebar when open · Minimize on scroll · Bottom accessory · Hide bar on detail |
-| 02 | Toolbars | System toolbar ✓ · With a bottom toolbar · Inline title, more actions · Custom bar ✗ |
-| 03 | List and detail | List beside detail ✓ · Three columns · Detail first · Push only ✗ |
+| 01 | Tab bar | Native tab bar ✓ · Sidebar when open · Minimize on scroll ✗ (does nothing on Duo) · Bottom accessory · Hide bar on detail |
+| 02 | Toolbars | System toolbar ✓ · With a bottom toolbar · Inline title, more actions · Custom bar ✗ · Navigation screen, default compression ✓ · Task screen, tabs give way ✓ · Visibility priorities ✓ · Own "more" menu ✗ · Text-only items ✗ |
+| 03 | List and detail | Two columns ✓ · Three columns · Detail first · One column, push ✗ |
 | 04 | Grids | Adaptive grid, even columns ✓ · Large adaptive tiles · Carousel rows · Fixed two columns ✗ · Clipped carousel ✗ |
 | 05 | Reading width | Readable column ✓ · Narrow form ✓ · Full-width text ✗ · Column, header left behind ✗ |
-| 06 | Media | Split around the fold ✓ (`ArrangementView`) · Panel over video · Fixed side panel · Full-bleed video · Panel in a sheet ✗ |
+| 06 | Media | Split around the fold ✓ · Panel over video · Fixed side panel · Full-bleed video · Panel in a sheet ✗ |
 | 07 | Floating overlays | Fold-aware overlay ✓ · Controls split by the fold · Fold-unaware ✗ |
-| 08 | Presentations | Form sheet · Page sheet · Popover · Alert · Confirmation dialog · Menu (system behavior) |
-| 09 | Hinge | Book pages · Lamp light · Card tilt (effects) |
+| 08 | Presentations | Form sheet · Page sheet · Popover · Alert · Confirmation dialog · Menu (built in) |
+| 09 | Hinge | Book pages · Lamp light · Card tilt (effects) · Effect only ✓ · Layout from angle ✗ · Haptic tick · Reduce Motion |
 | 10 | Pitfalls | Sizing from the screen · Symmetric insets · Insets cached at launch · Layout by orientation · Clamp to a phone column (each Broken / Fixed) |
+| 11 | Fold mid-task | State above the layout switch ✓ · Restore from storage · State inside each layout ✗ · Identity keyed on size class ✗ |
+| 12 | Laptop pose | Video up, controls down ✓ · Side by side · Same layout everywhere · Laptop-only layout ✗ · Controls on top ✗ |
+| 13 | Motion on fold | Animate the layout switch only ✓ · No animation · Animate everything ✗ · Reduce Motion crossfade (built in) |
+| 14 | Toasts | Inline status ✓ · Pill in the pane ✓ · Top banner · Centred on the window ✗ · Full-width bar ✗ · Alert ✗ |
 
-✓ = Recommended, ✗ = Avoid, unmarked = Consider unless noted.
+✓ = Recommended, ✗ = Avoid, unmarked = Worth a try unless noted.
+
+Capture switches: `-duolab.hideBar 1` hides the lab controls, `-duolab.present 1` opens a presentation at launch, `-duolab.pinToast 1` shows a toast at launch, `-reachOverlay 1` shows the reach bands.
 
 ## Deep links and launch args
 

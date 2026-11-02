@@ -56,12 +56,118 @@ struct SafeAreaOutline: View {
     }
 }
 
+/// Thumb reach bands for the current display: our model, not measured (docs/05 §1).
+/// Folded: one right thumb from the bottom-trailing corner. Open or book: two thumbs, one from
+/// each bottom corner, with the fold marked hard while it is active. Pose comes from the size
+/// class and the fold region, never from the hinge angle. The trailing side column is left clear.
+struct ReachOverlay: View {
+    static let storageKey = "reachOverlay"
+    /// Fixed thumb radii in points from the pivot corner; the same thumb on both displays.
+    static let easyRadius: CGFloat = 300
+    static let stretchRadius: CGFloat = 440
+
+    enum Band: CaseIterable {
+        case easy, stretch, hard
+
+        var title: String {
+            switch self {
+            case .easy: "Easy"
+            case .stretch: "Stretch"
+            case .hard: "Hard"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .easy: .green
+            case .stretch: .yellow
+            case .hard: .red
+            }
+        }
+    }
+
+    var body: some View {
+        EnvironmentProbe { snapshot in
+            let size = snapshot.size
+            let pivots = snapshot.horizontal == .regular
+                ? [CGPoint(x: 0, y: size.height), CGPoint(x: size.width, y: size.height)]
+                : [CGPoint(x: size.width, y: size.height)]
+            let content = CGRect(x: snapshot.safeArea.leading, y: 0,
+                                 width: max(size.width - snapshot.safeArea.leading - snapshot.safeArea.trailing, 0),
+                                 height: size.height)
+            ZStack(alignment: .topLeading) {
+                // Opaque layers composited once, so overlaps don't mix colours.
+                ZStack(alignment: .topLeading) {
+                    Rectangle().fill(Band.hard.color)
+                    discs(pivots, radius: Self.stretchRadius).fill(Band.stretch.color)
+                    discs(pivots, radius: Self.easyRadius).fill(Band.easy.color)
+                    if let fold = snapshot.fold {
+                        Rectangle().fill(Band.hard.color)
+                            .frame(width: fold.width, height: fold.height)
+                            .offset(x: fold.minX, y: fold.minY)
+                    }
+                }
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .mask(alignment: .topLeading) {
+                    Rectangle().frame(width: content.width, height: content.height).offset(x: content.minX)
+                }
+                .compositingGroup()
+                .opacity(0.22)
+                if let fold = snapshot.fold {
+                    // The fold is hard to hit even where a thumb reaches it; outline it so it reads.
+                    Rectangle()
+                        .strokeBorder(Band.hard.color.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                        .frame(width: fold.width, height: fold.height)
+                        .offset(x: fold.minX, y: fold.minY)
+                }
+                legend
+                    .padding(.leading, content.minX + 8)
+                    .padding(.top, 8)
+            }
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func discs(_ pivots: [CGPoint], radius: CGFloat) -> Path {
+        var path = Path()
+        for pivot in pivots {
+            path.addEllipse(in: CGRect(x: pivot.x - radius, y: pivot.y - radius, width: radius * 2, height: radius * 2))
+        }
+        return path
+    }
+
+    private var legend: some View {
+        HStack(spacing: 8) {
+            ForEach(Band.allCases, id: \.self) { band in
+                HStack(spacing: 3) {
+                    Circle().fill(band.color).frame(width: 7, height: 7)
+                    Text(band.title)
+                }
+            }
+            Text("· model, not measured").foregroundStyle(.white.opacity(0.7))
+        }
+        .font(.system(size: 10, weight: .medium))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(.black.opacity(0.65), in: Capsule())
+        .foregroundStyle(.white)
+    }
+}
+
 /// Adds the global HUD and the banner. Apply on the root and inside every full-screen cover.
 struct DuoChrome: ViewModifier {
+    /// Screens that draw the reach overlay themselves (under their own controls) pass false.
+    var includesReach = true
     @Environment(AppRouter.self) private var router
+    @AppStorage(ReachOverlay.storageKey) private var showsReach = false
 
     func body(content: Content) -> some View {
         content
+            .overlay {
+                if includesReach, showsReach { ReachOverlay() }
+            }
             .overlay {
                 if router.measure { HUDOverlay() }
             }
@@ -84,5 +190,5 @@ struct DuoChrome: ViewModifier {
 }
 
 extension View {
-    func duoChrome() -> some View { modifier(DuoChrome()) }
+    func duoChrome(includesReach: Bool = true) -> some View { modifier(DuoChrome(includesReach: includesReach)) }
 }
