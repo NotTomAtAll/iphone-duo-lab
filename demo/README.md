@@ -40,6 +40,10 @@ The thumbnails are rendered in hidden windows behind the app, in light and dark 
 | 15 | Two panes and drag | Two panes, drag across ✓ · Two panes, move by tap · One pane, push ✗ · Grid spanning the fold ✗ |
 | 16 | Keyboard per pose | Composer above the keyboard ✓ · Composer in its pane ✓ · Fixed bottom ✗ · Composer across the fold ✗ |
 | 17 | Transitions | Zoom into a push ✓ · Zoom into a cover · Plain push · Hand-made hero ✗ · No transition ✗ |
+| 18 | Camera per pose | Preview upright, controls flat ✓ · Book: controls beside the preview ✓ · Same everywhere · Rear-camera selfie on the outer display · Controls over the preview ✗ |
+| 19 | Small windows | Adaptive ✓ · Sized from the screen ✗ · Minimum-width guard ✗ · Not rebuilt: the compatibility box (built in) |
+
+**Guided tour:** `duolab://tour`, `duolab://tour/7?paused=1&compare=1`, or `-tour 1 -tourStep 7 -tourPaused 1 -tourCompare 1`.
 
 ✓ = Recommended, ✗ = Avoid, unmarked = Worth a try unless noted.
 

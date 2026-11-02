@@ -8,8 +8,9 @@ struct TopicsView: View {
     @Namespace private var zoom
     /// Both columns stay up open, even with a topic chosen: the pattern is the point.
     @State private var columns = NavigationSplitViewVisibility.all
+    @AppStorage("duolab.tourSeen") private var tourSeen = false
 
-    private var labs: [LabID] { LabID.allCases.filter { $0.options.first?.id != "placeholder" } }
+    private var labs: [LabID] { LabID.catalog }
 
     var body: some View {
         Group {
@@ -33,6 +34,7 @@ struct TopicsView: View {
         @Bindable var router = router
         return NavigationStack(path: $router.path) {
             List {
+                tourEntry
                 intro
                 Section {
                     ForEach(labs) { lab in
@@ -56,6 +58,7 @@ struct TopicsView: View {
             let window = proxy.size.width + proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing
             NavigationSplitView(columnVisibility: $columns) {
                 List(selection: selection) {
+                    tourEntry
                     intro
                     Section {
                         ForEach(labs) { lab in
@@ -80,16 +83,71 @@ struct TopicsView: View {
         }
     }
 
+    /// First launch: a one-time card. After that, a plain button at the top of the list.
+    private var tourEntry: some View {
+        Section {
+            if tourSeen {
+                Button { router.startTour() } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Start the tour").font(.headline)
+                            Text("Every topic\u{2019}s best answer, one after another. About \(TourStep.minutes) minutes.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(.tint)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                TourInvite(onStart: { router.startTour() }, onDismiss: { withAnimation { tourSeen = true } })
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 12))
+            }
+        }
+    }
+
     private var intro: some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Seventeen layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
+                Text("\(labs.count) layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
                 Text("Drag the floating bar out of the way; switch Open / Folded to see each answer on either display.")
                     .font(.footnote)
             }
             .foregroundStyle(.secondary)
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
+        }
+    }
+}
+
+/// "New here?" One time, at the top of the list; never in the way of the topics below it.
+private struct TourInvite: View {
+    var onStart: () -> Void
+    var onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "play.circle.fill")
+                .font(.largeTitle)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New here? Take the \(TourStep.minutes)\u{2011}minute tour.").font(.headline)
+                Text("It plays each topic\u{2019}s best answer, live, with a line on why. Touch the screen to hold it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Start the tour", systemImage: "play.fill", action: onStart)
+                    .buttonStyle(.glassProminent)
+                    .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+            Button("Not now", systemImage: "xmark", action: onDismiss)
+                .labelStyle(.iconOnly)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 32, height: 32)
+                .contentShape(.rect)
+                .buttonStyle(.plain)
         }
     }
 }

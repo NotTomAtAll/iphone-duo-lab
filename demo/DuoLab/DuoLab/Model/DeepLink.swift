@@ -6,14 +6,17 @@ import Foundation
 /// - `duolab://topic/<lab>` opens a topic page.
 /// - `duolab://topic/<lab>/<option>?<knob>=<value>&measure=1` previews an option.
 /// - `duolab://tab/<topics|playbook|device>`
+/// - `duolab://tour` starts the guided tour; `duolab://tour/<step>?paused=1&compare=1`.
 ///
-/// Launch arguments: `-topic <lab> -option <id> -knob.<name> <value> -measure 1 -tab <name>`.
+/// Launch arguments: `-topic <lab> -option <id> -knob.<name> <value> -measure 1 -tab <name>`,
+/// and `-tour 1 -tourStep <n> -tourPaused 1 -tourCompare 1` for the tour.
 struct DeepLink: Equatable {
     var tab: RootTab?
     var lab: LabID?
     var option: String?
     var knobs: [String: String] = [:]
     var measure: Bool?
+    var tour: TourLaunch?
     /// Problems found while parsing. Shown to the user, never fatal.
     var errors: [String] = []
 
@@ -42,13 +45,26 @@ struct DeepLink: Equatable {
             } else {
                 link.errors.append("Unknown tab “\(target)”")
             }
+        case "tour":
+            var tour = TourLaunch()
+            if let target = parts.first {
+                if let step = parseStep(target) { tour.step = step } else { link.errors.append("Tour step “\(target)” is not a number from 1") }
+            }
+            link.tour = tour
         default:
             link.errors.append("Unknown link \(url.absoluteString)")
         }
 
         for item in components.queryItems ?? [] {
             let value = item.value ?? ""
-            if item.name == "measure" {
+            if link.tour != nil, ["step", "paused", "compare"].contains(item.name) {
+                switch item.name {
+                case "step":
+                    if let step = parseStep(value) { link.tour?.step = step } else { link.errors.append("Tour step “\(value)” is not a number from 1") }
+                case "paused": link.tour?.paused = parseBool(value) ?? false
+                default: link.tour?.compare = parseBool(value) ?? false
+                }
+            } else if item.name == "measure" {
                 link.measure = parseBool(value)
             } else {
                 link.knobs[item.name] = value
@@ -60,6 +76,10 @@ struct DeepLink: Equatable {
     static func parse(arguments: [String]) -> DeepLink? {
         var link = DeepLink()
         var found = false
+        var tour: TourLaunch?
+        var tourStep: Int?
+        var tourPaused = false
+        var tourCompare = false
         var index = 0
         while index < arguments.count {
             let key = arguments[index]
@@ -87,6 +107,17 @@ struct DeepLink: Equatable {
             case "-measure":
                 found = true
                 link.measure = parseBool(value)
+            case "-tour":
+                if parseBool(value) == true {
+                    found = true
+                    tour = TourLaunch()
+                }
+            case "-tourStep":
+                if let step = parseStep(value) { tourStep = step } else { link.errors.append("Tour step “\(value)” is not a number from 1") }
+            case "-tourPaused":
+                tourPaused = parseBool(value) ?? false
+            case "-tourCompare":
+                tourCompare = parseBool(value) ?? false
             default:
                 if key.hasPrefix("-knob.") {
                     found = true
@@ -97,7 +128,18 @@ struct DeepLink: Equatable {
             }
             index += consumed ? 2 : 1
         }
+        if var tour {
+            tour.step = tourStep ?? 1
+            tour.paused = tourPaused
+            tour.compare = tourCompare
+            link.tour = tour
+        }
         return found ? link : nil
+    }
+
+    private static func parseStep(_ value: String) -> Int? {
+        guard let step = Int(value), step >= 1 else { return nil }
+        return step
     }
 
     private static func parseBool(_ value: String) -> Bool? {

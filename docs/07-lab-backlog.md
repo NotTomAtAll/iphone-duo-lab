@@ -24,7 +24,7 @@ was built on a simulated fold instead.
 
 | Done | In progress (round 3) | Not started |
 |---|---|---|
-| B1 → lab 11, B2 → lab 12, B4 → lab 13, B5 → lab 14, B6 → lab 02 options, B9 → lab 09 options, B13 → Device tab | B3, B7, B8, B10, B11, B14 | B12, B15 |
+| B1 → lab 11, B2 → lab 12, B4 → lab 13, B5 → lab 14, B6 → lab 02 options, B9 → lab 09 options, B13 → Device tab | B3, B7, B8, B10, B11, B14 | B12 (done: lab 19 Small windows), B15 |
 
 What the simulator showed while building the done items is in `08-findings.md`.
 

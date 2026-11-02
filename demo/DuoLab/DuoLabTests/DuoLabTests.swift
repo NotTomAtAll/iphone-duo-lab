@@ -62,6 +62,111 @@ struct DeepLinkTests {
     }
 }
 
+struct TourTests {
+    @Test func tourURL() throws {
+        let link = try #require(DeepLink.parse(url: URL(string: "duolab://tour")!))
+        #expect(link.tour == TourLaunch())
+        #expect(link.lab == nil)
+        #expect(link.errors.isEmpty)
+    }
+
+    @Test func tourURLWithStepPausedAndCompare() throws {
+        let link = try #require(DeepLink.parse(url: URL(string: "duolab://tour/7?paused=1&compare=1")!))
+        #expect(link.tour == TourLaunch(step: 7, paused: true, compare: true))
+        #expect(link.knobs.isEmpty)
+        let query = try #require(DeepLink.parse(url: URL(string: "duolab://tour?step=3")!))
+        #expect(query.tour?.step == 3)
+    }
+
+    @Test func badTourStepIsAnErrorNotACrash() throws {
+        let link = try #require(DeepLink.parse(url: URL(string: "duolab://tour/zero")!))
+        #expect(link.tour?.step == 1)
+        #expect(link.errors.count == 1)
+    }
+
+    @Test func tourLaunchArguments() throws {
+        let args = ["/path/DuoLab", "-tour", "1", "-tourStep", "7", "-tourPaused", "1", "-duolab.hideBar", "1"]
+        let link = try #require(DeepLink.parse(arguments: args))
+        #expect(link.tour == TourLaunch(step: 7, paused: true, compare: false))
+        #expect(link.errors.isEmpty)
+        let compare = try #require(DeepLink.parse(arguments: ["-tour", "yes", "-tourCompare", "1"]))
+        #expect(compare.tour == TourLaunch(step: 1, paused: false, compare: true))
+    }
+
+    @Test func tourStepWithoutTourDoesNothing() {
+        #expect(DeepLink.parse(arguments: ["/path/DuoLab", "-tour", "0", "-tourStep", "4"]) == nil)
+        #expect(DeepLink.parse(arguments: ["/path/DuoLab", "-tourStep", "4"]) == nil)
+    }
+
+    @Test func routerStartsTourAndClampsTheStep() {
+        let router = AppRouter()
+        router.handle(DeepLink(tour: TourLaunch(step: 3)))
+        #expect(router.tour?.step == 3)
+        #expect(router.banner == nil)
+
+        let far = AppRouter()
+        far.handle(DeepLink(tour: TourLaunch(step: 99)))
+        #expect(far.tour?.step == TourStep.all.count)
+        #expect(far.banner != nil)
+    }
+
+    @Test func openThisTopicRoutesAfterTheTourCloses() throws {
+        let router = AppRouter()
+        router.startTour()
+        let target = PreviewTarget(lab: .grids, optionID: GridsLab.options[0].id)
+        router.closeTour(opening: target)
+        #expect(router.tour == nil)
+        #expect(router.path.isEmpty)
+        let exit = try #require(router.takeTourExit())
+        #expect(exit == target)
+        #expect(router.path == [.grids])
+        #expect(router.takeTourExit() == nil)
+    }
+
+    @Test func stepsFollowTheCatalogWithTheRecommendedAnswer() {
+        let steps = TourStep.all
+        #expect(steps.map(\.lab) == LabID.catalog)
+        for step in steps {
+            #expect(step.option == step.lab.featuredOption)
+            if step.lab.options.contains(where: { $0.verdict == .recommended }) {
+                #expect(step.option.verdict == .recommended, "\(step.lab)")
+            }
+            #expect(step.avoid == nil || step.avoid?.verdict == .avoid)
+        }
+    }
+
+    @Test func clockAdvancesHoldsOnTouchAndStopsAtTheEnd() {
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        let model = TourModel(launch: TourLaunch())
+        // Not yet: 7.9 s in.
+        for _ in 0..<79 { #expect(!model.tick(0.1, now: start, reduceMotion: false)) }
+        #expect(model.tick(0.1, now: start, reduceMotion: false))
+        model.go(1)
+        #expect(model.index == 1 && model.elapsed == 0)
+
+        model.touched(now: start)
+        #expect(!model.tick(1, now: start.addingTimeInterval(4), reduceMotion: false))
+        #expect(model.elapsed == 0)
+        _ = model.tick(1, now: start.addingTimeInterval(5), reduceMotion: false)
+        #expect(model.elapsed == 1)
+
+        #expect(!model.tick(8, now: start, reduceMotion: true), "Reduce Motion never advances")
+
+        let last = TourModel(launch: TourLaunch(step: TourStep.all.count))
+        #expect(!last.tick(8, now: start, reduceMotion: false))
+        #expect(last.userPaused)
+        last.togglePlay()
+        #expect(last.index == 0 && !last.userPaused)
+    }
+
+    @Test func pausedLaunchStaysPaused() {
+        let model = TourModel(launch: TourLaunch(step: 7, paused: true))
+        #expect(model.index == 6)
+        #expect(!model.tick(8, reduceMotion: false))
+        #expect(model.elapsed == 0)
+    }
+}
+
 struct CatalogTests {
     @Test func everyTopicHasValidKnobs() {
         for lab in LabID.allCases {

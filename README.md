@@ -2,7 +2,7 @@
 
 **Try every iPhone Duo layout decision live, then pick the one that works.**
 
-DuoLab is a SwiftUI app for Apple's foldable iPhone. Seventeen questions every app has to answer on a device that folds, each with the realistic answers side by side, a verdict for each, and the reasoning behind it. Open an answer full screen, fold and unfold the simulator, and see what actually happens.
+DuoLab is a SwiftUI app for Apple's foldable iPhone. Nineteen questions every app has to answer on a device that folds, each with the realistic answers side by side, a verdict for each, and the reasoning behind it. Open an answer full screen, fold and unfold the simulator, and see what actually happens.
 
 ![DuoLab on the open and the folded display](docs/images/home.png)
 
@@ -33,11 +33,18 @@ xcrun simctl launch booted com.example.duolab -topic media -option arrangement-s
 | ![Fold mid-task](docs/images/continuity.png) **Fold mid-task** · Did anything get lost when I opened the phone? | ![Laptop pose](docs/images/laptop.png) **Laptop pose** · Half open on a table: what goes up top and what goes below? |
 | ![Motion](docs/images/motion.png) **Motion on fold** · Should the layout animate when the phone opens, and how much? | ![Toasts](docs/images/toasts.png) **Toasts** · Where should a "Saved" message appear on each display? |
 | ![Two panes](docs/images/twopanes.png) **Two panes and drag** · Can two screens live side by side, and can I drag between them? | ![Keyboard](docs/images/keyboard.png) **Keyboard per pose** · Where does the keyboard go, and does my draft survive a fold? |
-| ![Transitions](docs/images/transitions.png) **Transitions** · Which transitions feel right on a foldable, and which get in the way? | |
+| ![Transitions](docs/images/transitions.png) **Transitions** · Which transitions feel right on a foldable, and which get in the way? | ![Camera](docs/images/camera.png) **Camera per pose** · Where do the preview and the shutter go when the phone is half open? |
+| ![Small windows](docs/images/narrow.png) **Small windows** · What happens in Split View, next to a floating video, or at the old compatibility size? | |
 
 Every answer carries a verdict: **Recommended**, **Worth a try**, **Avoid**, or **Built in** when the system decides. The verdicts come from Apple's guidance where it exists, from what Samsung, Google and Microsoft learned on their foldables where it doesn't, and from measurement on the simulator. The **i** button on any answer shows the reasoning and, under *How it's built*, the exact API.
 
 ![An answer running full screen](docs/images/topic-page.png)
+
+## The tour
+
+New to the device? **Start the tour** on the home screen plays every topic's recommended answer live, eight seconds each, with one line on why. Flip on **Compare** and each step shows the recommended answer beside the one to avoid, split on the fold.
+
+![The guided tour comparing a recommended and an avoided answer](docs/images/tour.png)
 
 ## What the simulator taught us
 
@@ -52,6 +59,7 @@ Measured on the iPhone Duo simulator, iOS 27.1, and baked into the verdicts:
 - **In book pose the keyboard splits into two halves around the fold**, and it stays up across a fold as long as the field survives the layout change.
 - **Every sheet stays in one half in book pose.** Form, page and custom sizes all land in the leading half unless placed trailing; nothing spans the fold.
 - **A tab bar's minimize-on-scroll does nothing**, and when space runs out the system drops toolbar items first unless the screen says it prefers them.
+- **The simulator can't make the laptop pose** (a horizontal fold): rotating the open device changes the reported orientation but the window and the fold stay put. Laptop layouts in DuoLab are simulated and say so.
 
 ## The reasoning
 

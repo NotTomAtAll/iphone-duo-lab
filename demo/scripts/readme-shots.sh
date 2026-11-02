@@ -41,15 +41,22 @@ SHOT=(
   twopanes      "-topic twopanes -option split-drag"
   keyboard      "-topic keyboard -option composer-in-pane -duolab.focusComposer 1"
   transitions   "-topic transitions -option zoom"
+  camera        "-topic camera -option upright-preview-flat-controls -knob.simulatedPose laptop"
+  narrow        "-topic narrow -option adaptive"
+  tour          "-tour 1 -tourStep 7 -tourPaused 1 -tourCompare 1"
   topic-page    "-topic grids"
 )
 # Per-pose overrides (the open display shows the split with a topic selected).
 typeset -A SHOT_OPEN
 SHOT_OPEN=( home "-topic grids" )
-ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts twopanes keyboard transitions device)
+ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts twopanes keyboard transitions camera narrow tour device)
 NAMES=(${=SHOTS:-$ORDER})
 
-launch() { xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 -duolab.hideBar 1 ${=1} >/dev/null; sleep $WAIT; }
+launch() {
+  local hide="-duolab.hideBar 1"
+  [[ $1 == *"-tour 1"* ]] && hide=""   # the tour strip is part of the picture
+  xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 ${=hide} ${=1} >/dev/null; sleep $WAIT
+}
 
 for pose in open closed; do
   rocketsim duo pose $pose --udid "$UDID" >/dev/null; sleep 2

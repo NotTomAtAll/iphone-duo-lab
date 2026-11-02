@@ -35,6 +35,21 @@ struct RootView: View {
             }
         }
         .duoChrome()
+        .fullScreenCover(isPresented: tourShown, onDismiss: tourDidClose) {
+            TourScreen(launch: router.tour ?? TourLaunch())
+        }
         .onAppear { LaunchCache.captureIfNeeded() }
+    }
+
+    private var tourShown: Binding<Bool> {
+        Binding(get: { router.tour != nil }, set: { if !$0 { router.tour = nil } })
+    }
+
+    /// "Open this topic": the option fades in over its topic, without the cover's own slide.
+    private func tourDidClose() {
+        guard let target = router.takeTourExit() else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { router.preview = target }
     }
 }
