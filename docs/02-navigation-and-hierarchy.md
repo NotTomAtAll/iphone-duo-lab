@@ -9,7 +9,7 @@ Labs 01 (tab bar), 02 (toolbars) and 03 (list and detail) show the containers. T
 **where Back lives** on each display, **what a push does inside a split view**, or **how a zoom
 transition behaves when the source and destination sit in different panes**. Those are the questions
 people ask after the first fold. Backlog items B3 (collapse rules), B7 (zoom across panes) and B8
-(deep hierarchy on the inner display) answer them. The rule we demonstrate: *same hierarchy everywhere,
+(deep hierarchy on the inner display) answer them; all three are in progress (round 3). The rule we demonstrate: *same hierarchy everywhere,
 one extra level visible when open, and Back always at the top of the bar nearest the content it pops.*
 
 ## 1. Top-level navigation: tab bar vs sidebar
@@ -19,7 +19,7 @@ one extra level visible when open, and Back always at the top of the bar nearest
 | Native `TabView`, default placement | "tabs will appear on the inner and outer display, laying out vertically when appropriate" ([111461](https://developer.apple.com/videos/play/tech-talks/111461/), verified). On the vertical bar the tab bar "stays bottom aligned" ([111466](https://developer.apple.com/videos/play/tech-talks/111466/), verified). | vertical, in the trailing 84 pt rail, in every pose we captured (all landscape) | **Recommended** (lab 01) |
 | Sidebar on the inner display, `.defaultTabBarPlacement(.sidebar)` | "this isn't for every app. It works best for information-dense apps like this example from Health" ([111466](https://developer.apple.com/videos/play/tech-talks/111466/), verified) | opt-in only; `sidebarAdaptable` alone does not give a sidebar | **Consider** for 5+ destinations or sections (lab 01) |
 | Prominent tab (`TabRole.prominent`) | iOS 27; one tab, sits apart (verified, see tab bar facts #3) | not tested on Duo | **Consider**; a candidate option for lab 01 |
-| Minimize on scroll | HIG frames it as "minimize the tab bar to preserve the toolbar actions" in task views via `toolbarVerticalCompressionBehavior` (verified) | `.tabBarMinimizeBehavior` did nothing on Duo (measured, `demo/README.md`) | **Avoid** as a scroll effect; see B6 for the compression alternative |
+| Minimize on scroll | HIG frames it as "minimize the tab bar to preserve the toolbar actions" in task views via `toolbarVerticalCompressionBehavior` (verified) | `.tabBarMinimizeBehavior` did nothing on Duo (measured, `demo/README.md`) | **Avoid** as a scroll effect (lab 01 "Minimize on scroll"); for the compression alternative see lab 02 "Task screen: tabs give way" |
 | Custom bottom bar | Custom bars are not converted to vertical (verified) | stays a horizontal strip | **Avoid** |
 
 Others: Google replaces the bottom navigation bar with a **navigation rail** on large screens
@@ -27,6 +27,9 @@ Others: Google replaces the bottom navigation bar with a **navigation rail** on 
 and suggests a rail even on cover screens because it avoids cutouts and respects the short height
 ([Android postures](https://developer.android.com/design/ui/mobile/guides/layout-and-content/postures-and-orientation), secondary).
 Apple reached the same answer by moving the tab bar into the side rail. There's nothing to port.
+
+![Tab bar lab, sidebar when open](images/tabbar-sidebar.png)
+*Lab 01 "Sidebar when open": a sidebar on the open display (left); folded, the same tabs stand vertical in the trailing rail with their badges (right).*
 
 **Re-tap to pop to root** still matters: there is no native hook in SwiftUI, use a proxy binding
 (tab bar facts #21, secondary). On the inner display a re-tap should pop the *detail* column first,
@@ -60,6 +63,9 @@ pane that is meaningless on its own (comments, a playlist, tools) (secondary). O
 `ArrangementView(.split)` with a layout ratio (`splitArrangementLayoutRatio`), not a split view,
 because there is no navigation between the panes ([ArrangementView](https://developer.apple.com/documentation/swiftui/arrangementview), verified API; mapping is our view).
 Microsoft's "companion pane" is the same pattern ([Surface Duo walkthrough](https://devblogs.microsoft.com/surface-duo/dual-screen-app-design-walkthrough), secondary).
+
+![List and detail, open and folded](images/listdetail.png)
+*Lab 03 "Two columns: list + detail": list and detail side by side when open; folded, the selected item's detail stays with Back in the rail.*
 
 ## 3. Where Back goes
 
@@ -112,7 +118,10 @@ SwiftUI `NavigationSplitView` + `NavigationStack` in detail pattern).
 - **Where it doesn't**: list → detail inside a split view, where the destination opens in the *other*
   column. A zoom that flies across the fold to a different pane reads as a page change, not a push.
   Whether the system even animates a zoom from the content column into the detail column is
-  **unverified**; B7 should test it and show the plain push as the recommended option there.
+  **unverified**; B7 (in progress, round 3) should test it and show the plain push as the recommended option there.
+- **Measured trap** (DuoLab's own Topics list, `08-findings.md`): zooming from a card that shows the
+  *other* display's picture into the live screen produces a ghosted double image. Starting the cover
+  from the card's own cached picture fixes it; when the card shows the other display, a fade is safer.
 - **Fold during a zoomed-in view**: the source cell may move or vanish after the resize (different
   column count). The dismiss animation then has nowhere sensible to return to. Test it; if it looks
   wrong, let dismissal fall back to the default (our view; behaviour unverified).
@@ -121,9 +130,9 @@ SwiftUI `NavigationSplitView` + `NavigationStack` in detail pattern).
 
 | Pattern | Source | iOS equivalent | DuoLab |
 |---|---|---|---|
-| List-detail with explicit collapse rules | Google canonical layouts | `NavigationSplitView` + `preferredCompactColumn` | yes, B3 |
+| List-detail with explicit collapse rules | Google canonical layouts | `NavigationSplitView` + `preferredCompactColumn` | yes, B3 (in progress, round 3) |
 | Supporting pane (≈70/30) | Google canonical layouts | `ArrangementView(.split)` + layout ratio | yes, extends lab 06 |
-| Dual view (same data, two forms: map + list) | Microsoft Surface Duo | two-column split with a shared model | consider (B10) |
+| Dual view (same data, two forms: map + list) | Microsoft Surface Duo | two-column split with a shared model | consider (B10, in progress, round 3) |
 | Navigation rail instead of bottom bar | Google | system vertical tab bar | no, the system does it |
 
 ## Sources

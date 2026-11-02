@@ -16,7 +16,17 @@ show it. Camera and pointer items sit low because the simulator can't show them 
 Verification note for the build team: every option below can be checked by **navigating folded, then
 changing pose, then capturing** (`practices/simulator-capture.md`). Items that need a portrait inner
 display (B2, B14) first need one measurement we don't have: the window size, size class and bar axis
-on the inner display **rotated to portrait**. Capture that before building them.
+on the inner display **rotated to portrait**. Round 2 tried: rotating the open simulator changes the
+reported orientation but keeps the 951×669 window and the upright fold, so this needs hardware. Lab 12
+was built on a simulated fold instead.
+
+## Status (2026-11-03)
+
+| Done | In progress (round 3) | Not started |
+|---|---|---|
+| B1 → lab 11, B2 → lab 12, B4 → lab 13, B5 → lab 14, B6 → lab 02 options, B9 → lab 09 options, B13 → Device tab | B3, B7, B8, B10, B11, B14 | B12, B15 |
+
+What the simulator showed while building the done items is in `08-findings.md`.
 
 ## Top 5
 
@@ -31,6 +41,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 ---
 
 ## B1 · Fold mid-task ★ top 5
+**Status: done**, lab 11 Fold mid-task. Findings in `08-findings.md` (State across folds).
 - **Question.** "I was in the middle of something and opened the phone. Did anything get lost?"
 - **Setup.** One screen with a tab, a list with a selected row, a pushed detail, a half-typed text field
   with focus, a playing (fake) progress bar, a scrolled list, and an optional open sheet. A checklist
@@ -48,6 +59,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** M.
 
 ## B2 · Laptop pose: view up, controls down ★ top 5
+**Status: done**, lab 12 Laptop pose, on a simulated fold: the simulator could not produce a laptop pose, so the portrait-inner measurement is still missing.
 - **Question.** "On a table, half open, what goes in the top half and what in the bottom?"
 - **Setup.** A generic media screen (gradient "video", transport, scrubber, an up-next list, an alert
   trigger). Works in every pose; the laptop pose is where options differ.
@@ -65,6 +77,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** M (needs the portrait-inner measurement first).
 
 ## B3 · Collapse and expand rules for list-detail
+**Status: in progress (round 3).**
 - **Question.** "When it closes, do I see the list or the thing I was reading? When it opens, is the list in sync?"
 - **Options.**
   - *Detail wins if selected, list highlights on expand, hint in empty detail* — **Recommended** (Google's rules).
@@ -76,6 +89,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** S.
 
 ## B4 · Motion on fold ★ top 5
+**Status: done**, lab 13 Motion on fold.
 - **Question.** "Should the layout animate when I open the phone, and how much?"
 - **Setup.** One layout that changes mode on fold (list → split, a floating button that moves off the
   fold, a grid that gains columns), with four motion options.
@@ -93,6 +107,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** M.
 
 ## B5 · Toasts and banners ★ top 5
+**Status: done**, lab 14 Toasts and banners.
 - **Question.** "Where should a 'Saved' message appear on each display and pose?"
 - **Options.**
   - *Inline status* (the change itself, or a status line in the bar) — **Recommended** where possible.
@@ -108,6 +123,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** M.
 
 ## B6 · Bar compression and overflow ★ top 5
+**Status: done**, as five new options in lab 02 Toolbars ("Browse screen: actions give way", "Task screen: tabs give way", "Keep frequent actions longest", "Own more menu", "Text-only actions").
 - **Question.** "When the side bar runs out of room, what disappears first: tabs or toolbar buttons?"
 - **Setup.** A tab view with a screen carrying 6–8 toolbar items, one badged. Space pressure from
   landscape on the outer display, or by showing the keyboard.
@@ -124,6 +140,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Effort.** S–M.
 
 ## B7 · Zoom transitions on Duo
+**Status: in progress (round 3).**
 - **Question.** "Where does the zoom transition help, and where does it confuse?"
 - **Options.** *Grid → full-screen item* — **Recommended.** · *List → detail in the other pane* —
   **Avoid** (use the plain push). · *Sheet morphing from its toolbar button* — **Recommended**.
@@ -132,6 +149,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Justified by.** 02 §5; 04 §1. **Effort.** S.
 
 ## B8 · Deep hierarchy on the inner display
+**Status: in progress (round 3).**
 - **Question.** "Level 3, 4, 5: where do they go when list and detail are both on screen?"
 - **Options.** *Push inside the detail column* — **Recommended.** · *Shift columns left* — **Avoid.**
   · *Three columns* — **Avoid** (only two show, measured). · *Sheet for a self-contained task* — **Consider.**
@@ -139,6 +157,7 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Justified by.** 02 §4. **Effort.** S.
 
 ## B9 · Hinge effect hygiene (extend lab 09)
+**Status: done**, as four new options in lab 09 Hinge effects ("Angle drives the effect only", "Angle decides the layout", "Light tap at each pose", "With Reduce Motion").
 - **Question.** "How do I make a hinge effect feel good and not jittery?"
 - **Options.** *Direct angle mapping, smoothed, thresholds with hysteresis* — **Recommended.**
   · *`withAnimation` on every angle change* — **Avoid** (lags the hand). · *Light haptic on a threshold* — **Consider.**
@@ -146,12 +165,14 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Justified by.** 00 P10; 03 §5; 04 §4. **Effort.** S.
 
 ## B10 · Dual view and drag between panes
+**Status: in progress (round 3).**
 - **Question.** "Can two panes show the same data two ways and stay in sync?"
 - **Options.** *Shared model, two representations (a grid of tiles + a list), selection mirrored* —
   **Consider.** · *Drag a row into the detail pane* — **Consider.** · *Drop target in the fold* — **Avoid.**
 - **Justified by.** 05 §3; 06 row 18. **Effort.** M.
 
 ## B11 · Sheet placement and sizing on the inner display (extend lab 08)
+**Status: in progress (round 3).**
 - **Question.** "Centre, leading or trailing? Form or page? Vertical bar or not?"
 - **Options.** *Automatic/centre form sheet* — **Recommended** default. · *Trailing sheet for detail edits*
   — **Recommended** (gets a vertical bar). · *Leading sheet for list filters* — **Consider.**
@@ -167,11 +188,13 @@ on the inner display **rotated to portrait**. Capture that before building them.
 - **Justified by.** 01 §7; 06 row 25; HIG Split View notes. **Effort.** M–L.
 
 ## B13 · Reach zones overlay (Device tab or HUD)
+**Status: done**, in the Device tab ("Show thumb reach zones everywhere"), labelled "our model, not measured".
 - **Question.** "Is this button where a thumb can reach it in this pose?"
 - **Options.** Overlay only, no verdicts: closed one-hand, open two-hand, book, laptop. Label it "our model, not measured".
 - **Justified by.** 05 §1. **Effort.** S.
 
 ## B14 · Keyboard and composer per pose
+**Status: in progress (round 3).** The laptop-pose capture it needs may not be possible on the simulator.
 - **Question.** "Where does my text field end up when the keyboard is up, in each pose?"
 - **Options.** *Keyboard safe area (default)* — **Recommended.** · *Fixed keyboard height guess* — **Avoid.**
   · *Composer with fold margin in laptop pose* — **Consider** (only if capture shows it in the curve).

@@ -8,9 +8,10 @@ Researched 2026-11-02. Confidence: **verified** (Apple source or Xcode 27.1 SDK 
 The existing labs show each pose as a still picture. People don't use the device that way: they read
 a list closed, open it to see the detail, prop it on a table for a video, and close it again. Each step
 is a live resize of the same scene (verified, [Preparing doc](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo)).
-DuoLab should therefore add one lab where you **start a task, fold, and check what survived**
-(backlog B1), and one where the **laptop pose** gets its view-up, controls-down layout (B2). This
-doc defines what "survived" means and what is allowed to change.
+DuoLab therefore has one lab where you **start a task, fold, and check what survived**
+(lab 11 Fold mid-task, was backlog B1), and one where the **laptop pose** gets its view-up,
+controls-down layout (lab 12 Laptop pose, was B2). This doc defines what "survived" means and what is
+allowed to change. What the simulator actually did is in `08-findings.md`.
 
 ## 1. The poses, and what the app can actually see
 
@@ -19,7 +20,7 @@ doc defines what "survived" means and what is allowed to change.
 | Closed | outer | 466×678 pt, compact × regular | size class; hinge `.closed` | verified + measured |
 | Closed, landscape ("like a tent") | outer | compact × compact | size class | verified ([111461](https://developer.apple.com/videos/play/tech-talks/111461/)): "a great opportunity to support landscape orientation, as people may want to set the phone down like a tent" |
 | Partially folded "like a book" (inner in landscape) | inner | 951×669 pt, regular × regular | active `.division` region, roughly vertical; hinge `.partiallyOpen` + angle | verified; DuoLab measured fold near x≈475 |
-| "Seated on a table like a laptop with the inner display facing you" (inner in portrait, half folded) | inner | ≈669×951 pt (portrait), regular × regular | active `.division` region, wide and short (horizontal fold); hinge `.partiallyOpen` | pose verified ([111466](https://developer.apple.com/videos/play/tech-talks/111466/)); window size in portrait **unverified** (we only measured landscape) |
+| "Seated on a table like a laptop with the inner display facing you" (inner in portrait, half folded) | inner | ≈669×951 pt (portrait), regular × regular | active `.division` region, wide and short (horizontal fold); hinge `.partiallyOpen` | pose verified ([111466](https://developer.apple.com/videos/play/tech-talks/111466/)); window size in portrait **unverified**: rotating the open simulator keeps a 951×669 window with an upright fold, so this pose can't be produced there (measured, `08-findings.md`) |
 | "Standing on its own, resting on its edges" | either | depends | hinge status/angle | pose verified ([111466](https://developer.apple.com/videos/play/tech-talks/111466/)); which display is active **unverified** |
 | Fully open | inner | 951×669 pt, regular × regular | `.division` reported but `isActive == false`; hinge `.fullyOpen` | verified + measured |
 
@@ -52,13 +53,18 @@ We adopt the union as DuoLab's continuity checklist:
 | Selected item in a list/detail | Google canonical list-detail | selection kept in the list view's `@State` instead of above the split view |
 | Scroll position | Google, Samsung | view identity changes (`.id(sizeClass)`), or list replaced by grid in another branch |
 | Typed text in fields, and the draft | Google, Samsung | field lives in a branch that is destroyed |
-| Keyboard focus / keyboard still up | Google ("keyboard state is restored"), Samsung ("keyboard remaining open") | `@FocusState` lost on rebuild. Whether iOS keeps the keyboard up across a fold is **unverified** |
+| Keyboard focus / keyboard still up | Google ("keyboard state is restored"), Samsung ("keyboard remaining open") | `@FocusState` lost on rebuild. Lab 11: focus survives with state above the switch (measured); the keyboard stayed up in the main run but not in a later one (**likely**) |
 | Media playback position and play state | Google | player owned by a view instead of a model |
 | A presented sheet / popover | our view (Apple says sheets "adapt to all poses", [111461](https://developer.apple.com/videos/play/tech-talks/111461/)) | presentation flag in a destroyed branch dismisses it |
 | Undo stack, in-progress gesture result | our view | |
 
 The fix is the same in every row: **hoist state above the size-class branch and keep view identity
-stable**. `CHECKLIST.md` §6 already says this; B1 makes it visible.
+stable**. `CHECKLIST.md` §6 already says this; lab 11 makes it visible. On the simulator, state held
+above the switch kept selection, scroll, text, focus, progress and an open sheet across fold→open and
+open→closed; `.id(sizeClass)` and per-branch `@State` reset all of it (measured, `08-findings.md`).
+
+![Fold mid-task, open and folded](images/continuity.png)
+*"State above the layout switch": the same note open (left) and folded (right), with the typed text, cursor and memo progress kept.*
 
 ## 3. What should change, and how much
 
@@ -68,7 +74,7 @@ stable**. `CHECKLIST.md` §6 already says this; B1 makes it visible.
 | Column count of grids | "prefer an even number of columns so content divides cleanly" when folded (verified) | Recommended. Already lab 04. |
 | Bars horizontal ↔ vertical | system decides; inner portrait keeps horizontal bars (verified, [HIG](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo)) | System. Don't fight it. |
 | Element nudged off the fold | "Move only what's necessary" (verified) | Recommended, lab 07. |
-| A whole new layout for laptop pose | optional; "just be sure it has all the same controls and general hierarchy" (verified, [111466](https://developer.apple.com/videos/play/tech-talks/111466/)) | Consider. Backlog B2. |
+| A whole new layout for laptop pose | optional; "just be sure it has all the same controls and general hierarchy" (verified, [111466](https://developer.apple.com/videos/play/tech-talks/111466/)) | Consider. Lab 12 Laptop pose. |
 | Hiding features in one pose | "Don't limit functionality to one pose" (verified) | Avoid. |
 | Re-ordering controls between poses | "keep controls' relative positions as similar as possible" (verified) | Avoid. |
 
@@ -98,6 +104,8 @@ Everyone converges on the same layout:
 - Read `@Environment(\.overlayArrangementZIndex)` in the controls to switch between a compact
   overlay version and an expanded "control deck" version ([doc](https://developer.apple.com/documentation/swiftui/environmentvalues/overlayarrangementzindex)).
   Apple's own demo does exactly this for an Up Next list ([111463](https://developer.apple.com/videos/play/tech-talks/111463/)).
+  On the simulator it read 0 in closed, book and open; laptop pose couldn't be tested (measured,
+  `08-findings.md`). Lab 12 switches its expanded controls from the active division region instead.
 - Use `.overlayArrangementEdge(...)` to flip which side the primary lands on in book pose.
 - Keep the arrangement *inside* navigation, not around it, and never inside a `List` or `ScrollView`
   (verified, [HIG](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo)).
@@ -107,6 +115,9 @@ while the device sits still: transport controls, a scrubber, camera shutter and 
 composer, and the alert's buttons. What stays on top: the thing being watched, the camera preview,
 the other person in a call, a large clock or timer. A list of related items can go in the bottom half
 only if it is scrollable; it is "controls" in the sense that you touch it.
+
+![Laptop pose, simulated, open and folded](images/laptop.png)
+*Lab 12 "Video up, controls down" with the simulated laptop fold drawn in: video wholly above the band, transport, scrubber and Up next below it. Simulated, not a real laptop pose.*
 
 ## 5. Book pose
 
@@ -130,7 +141,7 @@ only if it is scrollable; it is "controls" in the sense that you touch it.
   Our view: show the detail if the person was looking at it; show the list if nothing was selected.
 - A popover on the inner display becomes a sheet in compact width by default; control it with
   `presentationCompactAdaptation(_:)` ([doc](https://developer.apple.com/documentation/swiftui/view/presentationcompactadaptation(_:)), verified API).
-  What happens to an *already open* popover when you close the device is **unverified**: lab B1 should show it.
+  What happens to an *already open* popover when you close the device is **unverified**: lab 11 tests a sheet, not a popover, so this is still open.
 - New windows cannot be created on the outer display; handle errors when requesting scenes
   (verified, [111464](https://developer.apple.com/videos/play/tech-talks/111464/)).
 

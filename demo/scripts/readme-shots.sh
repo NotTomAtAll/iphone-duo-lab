@@ -38,9 +38,12 @@ SHOT=(
   laptop        "-topic laptop -option overlay -knob.simulatedPose laptop"
   motion        "-topic motion -option mode"
   toasts        "-topic toasts -option pill -duolab.pinToast 1"
+  twopanes      "-topic twopanes -option split-drag"
+  keyboard      "-topic keyboard -option composer-in-pane -duolab.focusComposer 1"
+  transitions   "-topic transitions -option zoom"
   topic-page    "-topic grids"
 )
-ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts device)
+ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts twopanes keyboard transitions device)
 NAMES=(${=SHOTS:-$ORDER})
 
 launch() { xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 -duolab.hideBar 1 ${=1} >/dev/null; sleep $WAIT; }

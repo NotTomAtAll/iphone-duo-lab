@@ -48,3 +48,17 @@ job is not "add an inset everywhere" but: keep carousels' *tappable* cards clear
 partial overlap but keep a hit target), re-add the trailing inset on full-screen surfaces, and inset sheet
 content. The earlier "header icons hidden under the clock" reading was wrong: the bell and cart end at
 x ≈ 368, inside the safe area.
+
+## Round 2 additions (2026-11-03)
+
+The build rounds added findings beyond the geometry above: bar compression and overflow, the tab bar
+accessory and minimize behaviour, two-column split views, hinge API values at launch, rotation of the
+open device, state across folds, toast placement, and rendering traps (thumbnails, zoom transition).
+They are collected, grouped and labelled measured / likely / unverified in
+[`docs/08-findings.md`](../docs/08-findings.md). Two that change how to read this file:
+
+- **Rotation does not give a laptop pose on the simulator.** Rotating the open device changes the
+  reported orientation, but the inner window stays 951 × 669 with the same upright fold (x 456, width 40).
+  The portrait inner window (laptop pose) is still unmeasured.
+- **A GeometryReader inside a pane's overlay reports the window's insets (R84, B34)** even though its
+  frame already excludes them. Do not add them twice.

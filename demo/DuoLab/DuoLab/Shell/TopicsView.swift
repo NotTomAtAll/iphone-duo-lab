@@ -10,7 +10,7 @@ struct TopicsView: View {
         NavigationStack(path: $router.path) {
             List {
                 Section {
-                    Text("Fourteen layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
+                    Text("Seventeen layout questions for a foldable. Open one to see the possible answers, then try each answer full screen.")
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))

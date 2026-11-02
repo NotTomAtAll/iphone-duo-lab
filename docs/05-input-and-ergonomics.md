@@ -7,8 +7,9 @@ No hands-on device testing was done; reach claims are reasoning, not measurement
 
 The 951 pt inner display is held with two hands, propped on a table, or folded like a book. Each
 grip puts a different part of the screen under the thumbs, and the keyboard moves (and splits)
-with the pose. DuoLab can't measure hands, but it can **overlay reach zones per pose** (backlog B13),
-**show where a composer sits when the keyboard is up in each pose** (B14), and **lay out a camera
+with the pose. DuoLab can't measure hands, but it **overlays reach zones per pose** (Device tab,
+"Show thumb reach zones everywhere", was backlog B13; labelled "our model, not measured"), can
+**show where a composer sits when the keyboard is up in each pose** (B14, in progress, round 3), and can **lay out a camera
 screen for every pose with a placeholder preview** (B15; the simulator has no camera). These are
 lower priority than continuity and laptop pose, but they are where Duo apps feel wrong in the hand.
 
@@ -51,14 +52,16 @@ is about slab phones and is secondary context only)
 | On a desk in laptop pose, the keyboard occupies the **bottom half**, text above | secondary | [MacRumors](https://www.macrumors.com/2026/10/26/iphone-duo-is-apples-tiniest-laptop/) |
 | A Bluetooth keyboard works and hides the on-screen keyboard | secondary | [iThinkDiff](https://www.ithinkdiff.com/iphone-duo-tablet-mode-keyboard-mouse/) |
 | Whether a split Duo keyboard reports as "undocked" to `UIKeyboardLayoutGuide.followsUndockedKeyboard` | **unverified** | [UIKeyboardLayoutGuide](https://developer.apple.com/documentation/uikit/uikeyboardlayoutguide) exists |
-| Whether the keyboard stays up across a fold | **unverified** (Google and Samsung require it) | [Tier 3](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3), [Samsung](https://developer.samsung.com/one-ui/largescreen-and-foldable/designing_for_foldable.html) |
+| Whether the keyboard stays up across a fold | **likely** on the simulator: it stayed up in lab 11's main run, one later run kept the cursor but not the keyboard (Google and Samsung require it) | `08-findings.md`, [Tier 3](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3), [Samsung](https://developer.samsung.com/one-ui/largescreen-and-foldable/designing_for_foldable.html) |
+| With the keyboard up, the tab bar hides completely folded and sits under the keyboard open; toolbar actions stay | measured (simulator) | lab 02 "Browse screen: actions give way", `08-findings.md` |
 
 What we recommend (our view):
 - **Use the keyboard safe area, not a guessed height.** SwiftUI does this by default; in UIKit pin to
   `view.keyboardLayoutGuide`. A split keyboard leaves the centre uncovered; don't add a full-width
   bottom inset when only the corners are covered.
 - **Composer placement in laptop pose:** if the keyboard owns the bottom half, a composer pinned above
-  the keyboard lands right at the fold. Capture this (B14) before deciding; if it sits in the curve,
+  the keyboard lands right at the fold. Capture this (B14, in progress) before deciding; the simulator
+  can't produce laptop pose, so this may need hardware; if it sits in the curve,
   give it a margin from the division region.
 - **Don't fight the split keyboard** with custom input views that assume a full-width keyboard.
 - **External keyboard:** the inner display is regular × regular, so iPad-style keyboard shortcuts
@@ -78,7 +81,7 @@ What we recommend (our view):
   Microsoft built Surface Duo patterns around dragging between screens (secondary).
 - Our view: a drag *through* the fold is fine (it's continuous movement, like scrolling); a **drop
   target in the fold** is not. Highlight the target pane, not a strip at the seam. DuoLab could show
-  this in the list/detail lab as "drag a row into the detail" (B10, optional).
+  this in the list/detail lab as "drag a row into the detail" (B10, optional; in progress, round 3).
 
 ## 4. Pointer and hover
 

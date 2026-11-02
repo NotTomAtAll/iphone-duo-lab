@@ -129,7 +129,7 @@ final class ThumbnailRenderer {
         window.isHidden = false
         window.layoutIfNeeded()
         // Tab bars and split views finish their first layout asynchronously; plain views don't.
-        let slow: Set<LabID> = [.tabBar, .toolbars, .listDetail, .media, .continuity, .toasts, .laptopPose]
+        let slow: Set<LabID> = [.tabBar, .toolbars, .listDetail, .media, .continuity, .toasts, .laptopPose, .twoPanes, .keyboard, .transitions]
         try? await Task.sleep(for: .milliseconds(slow.contains(job.lab) ? 450 : 160))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

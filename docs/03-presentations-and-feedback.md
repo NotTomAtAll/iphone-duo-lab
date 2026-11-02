@@ -8,8 +8,8 @@ Lab 08 shows the system presentations as they are (form sheet, page sheet, popov
 confirmation dialog, menu), because Apple moves them for us. What's missing is the *choices* a team
 still makes: **sheet placement and sizing on the inner display**, **whether a sheet keeps its vertical
 bar**, and above all **toasts and banners**, which Apple doesn't ship and every app builds. Toasts are
-where we see the most fold and rail bugs (`CHECKLIST.md` §7). Backlog B5 (toasts, top 5) and B11
-(sheet placement) turn this doc into options with verdicts.
+where we see the most fold and rail bugs (`CHECKLIST.md` §7). Lab 14 Toasts and banners (was backlog
+B5) turns §4 into options with verdicts; B11 (sheet placement) is in progress (round 3).
 
 ## 1. What the system does for you (don't rebuild it)
 
@@ -41,9 +41,14 @@ screens… Small edit menus or modals don't cover the entire screen" ([Tier 2 UI
 For a filter sheet on a wide screen Google suggests a **side sheet** ([Android postures](https://developer.android.com/design/ui/mobile/guides/layout-and-content/postures-and-orientation), secondary);
 on Duo that is `presentationPlacement(.trailing)` or `.leading` (our mapping).
 
-**Folding with a sheet open** (B1 checks this): the sheet must stay presented, keep its scroll and
+**Folding with a sheet open** (lab 11 Fold mid-task checks this): the sheet must stay presented, keep its scroll and
 input, and re-place itself. Apple says sheets "adapt to all poses" (verified, [111461](https://developer.apple.com/videos/play/tech-talks/111461/)).
+On the simulator a sheet whose flag lives above the size-class switch stayed up across fold→open and
+open→closed; `.id(sizeClass)` on the root dismissed it (measured, `08-findings.md`).
 Whether a custom detent re-resolves on fold is **unverified**.
+
+![Presentations lab, sheet open and folded](images/sheets.png)
+*Lab 08: the same sheet centred with a capped width on the open display, and filling the width with Close in the trailing corner when folded.*
 
 ## 3. Popovers, menus, alerts
 
@@ -84,7 +89,10 @@ Whether a custom detent re-resolves on fold is **unverified**.
    lives in the rail, so the top edge is free, which is tempting, but don't.
 3. **Centre on the content area, not the window.** On both displays the window has an 84 pt trailing
    rail; centring on the window puts the pill 42 pt off-centre and can tuck its edge under the rail.
-   Size from the live safe area at show time (already `CHECKLIST.md` §7).
+   Size from the live safe area at show time (already `CHECKLIST.md` §7). Measured trap: a
+   GeometryReader inside the pane's overlay already excludes the rail and bottom inset from its frame
+   but still reports them as insets; subtracting them again pushes the pill off-centre. Use the
+   frame only (`08-findings.md`).
 4. **Inner display, flat: in the pane the action came from.** A list action toasts over the list, a
    detail action over the detail. Same reason Apple keeps controls "near the content they affect".
    Cap the width (≈ 360 pt) so it doesn't stretch across 867 pt.
@@ -103,6 +111,13 @@ Whether a custom detent re-resolves on fold is **unverified**.
    toast the only way to undo (Material allows one action; we'd still mirror Undo elsewhere). HIG:
    "Make sure all feedback is accessible" (verified, [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback)).
 
+Lab 14 shows these as options: "Show the change itself" and "Pill in the pane" (Recommended), "Banner
+that pushes content" (Consider), "Pill centred on the window", "Full-width bar" and "Alert box" (Avoid).
+Laptop-pose and keyboard placement (rules 6–7) are not covered by a capture yet.
+
+![Toasts and banners, open and folded](images/toasts.png)
+*"Pill in the pane": the "Saved" pill sits in the detail pane it came from on the open display, and centred on the content (not the window) when folded.*
+
 ## 5. Haptics on pose change
 
 - Apple documents **no haptic for folding** and no haptic guidance for Duo (verified by absence in the
@@ -116,6 +131,8 @@ Whether a custom detent re-resolves on fold is **unverified**.
   (`sensoryFeedback(_:trigger:)`, [doc](https://developer.apple.com/documentation/swiftui/view/sensoryfeedback(_:trigger:)), verified API)
   when a **hinge-driven effect** crosses a meaningful threshold the user is aiming for (a lamp
   switching on at 90°, a page landing), once per crossing, with hysteresis so it doesn't chatter.
+  Lab 09 "Light tap at each pose" (Consider) shows this; the simulator has no haptics, so it flashes a
+  tick mark instead.
   Samsung and Google say nothing about haptics on posture (verified by absence in the pages we read).
 
 ## Sources

@@ -8,10 +8,12 @@ Nothing here was timed or recorded by this research pass.
 Apple animates its own chrome when the device folds (bars change axis, sheets slide off the fold,
 Liquid Glass morphs). Apple says almost nothing about how *your* content should animate when the
 window resizes under it. That gap is where apps either snap harshly or animate through garbage
-frames. DuoLab should add one lab (backlog B4, top 5) that runs the **same layout change four ways**
-(no animation, animate everything, animate only the discrete change, reduce motion) so people can
-fold the simulator and see the difference. Lab 09 (hinge effects) gets a Reduce Motion switch and
-smoothing (B9).
+frames. Lab 13 Motion on fold (was backlog B4) runs the **same layout change four ways**
+("Animate the layout switch only", "No animation", "Animate every size change", "Reduce Motion:
+crossfade") so people can fold the simulator and see the difference. Lab 09 Hinge effects now has
+"Angle drives the effect only", "Angle decides the layout", "Light tap at each pose" and "With Reduce
+Motion" (was B9). The simulator jumps between poses, so it shows the end states and the switch, not
+the smoothness of a real fold (`08-findings.md`).
 
 ## 1. What Apple ships for motion (verified)
 
@@ -58,6 +60,9 @@ at 669×951 with an 82 pt top inset, and sometimes a zero-size window on reconne
 `research/on-device-measurements.md`). An implicit animation on raw geometry animates *through* those
 frames.
 
+![Motion on fold, open and folded](images/motion.png)
+*Lab 13 "Animate the layout switch only": two panes and a 4-column grid open, one column and 2 tiles folded; the floating button sits clear of the fold in both. Stills only: run the lab to see the motion.*
+
 **Rule A. Animate discrete layout modes, not sizes.** Derive a small enum from inputs that only change
 at real boundaries: horizontal size class, whether a `.division` region is active, and the
 arrangement's z-index or split axis. Attach the animation to that value:
@@ -99,7 +104,7 @@ Google treats a lost scroll position as a quality failure (secondary, [Tier 3](h
 **UIKit equivalent.** Do mode changes in `viewWillTransition(to:with:)` with
 `coordinator.animate(alongsideTransition:)` so they ride the system's resize animation; observe
 `horizontalSizeClass` via trait registration. Whether the Duo fold drives `viewWillTransition` the same
-way rotation does is **unverified**; B4 should log it.
+way rotation does is **unverified**; lab 13 is SwiftUI only, so this is still open.
 
 **Presets we'll use** (our view): `.smooth` (no bounce) for layout modes; `.snappy` for a single
 element nudged off the fold; no `.bouncy` on layout, bounce on a 951 pt surface reads as wobble.
@@ -117,6 +122,11 @@ element nudged off the fold; no `.bouncy` on layout, bounce on a 951 pt surface 
   (verified API, [UIHinge.Status](https://developer.apple.com/documentation/uikit/uihinge/status-swift.enum)).
 - Disable the effect when not visible (`onHingeChange(isEnabled:)`) to save work (verified API in the
   Xcode 27.1 SDK interface).
+- On the simulator `onHingeChange` delivers the current pose at launch, so the effect starts in the
+  right state (measured, `08-findings.md`).
+
+![Hinge effects, open and folded](images/hinge.png)
+*Lab 09 "Book pages": the angle drives the page turn only (flat at 180°, folded at 0°); nothing in the layout depends on it.*
 
 ## 5. What not to animate
 
@@ -138,7 +148,7 @@ element nudged off the fold; no `.bouncy` on layout, bounce on a 951 pt surface 
 - Hinge effects under Reduce Motion: keep the *state* change (lamp on/off) but drop the continuous
   motion (no tilt, no parallax) (our view; HIG "Make motion optional").
 - Zoom transitions: the system handles Reduce Motion for navigation transitions; we haven't verified
-  what zoom degrades to on iOS 27.1 (**unverified**, add to B4).
+  what zoom degrades to on iOS 27.1 (**unverified**; lab 13 doesn't use zoom, B7 in round 3 should check it).
 
 ## Sources
 

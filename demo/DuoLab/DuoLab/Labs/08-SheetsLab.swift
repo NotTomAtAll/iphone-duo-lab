@@ -32,6 +32,26 @@ enum SheetsLab {
                   pros: ["Lightweight, stays near the button"], cons: [],
                   lookFor: "Open the trailing menu next to the rail.",
                   knobs: ["kind": "menu"]),
+        LabOption("sheet-trailing-half", "Sheet in the right half", .recommended,
+                  summary: "On the open display the sheet sits on the right, next to the part it edits, and the left half stays usable.",
+                  pros: ["Sits next to the content it changes", "The other half stays visible and tappable",
+                         "Gets the side bar for its buttons"],
+                  cons: ["Folded it is a normal bottom sheet, so check both"],
+                  lookFor: "Open it in book pose: the card should stay in the right half, clear of the fold. Tap the left half while it is open.",
+                  knobs: ["kind": "sheet", "sizing": "form", "placement": "trailing", "interact": "on"]),
+        LabOption("sheet-centered", "Card asked to sit in the middle", .system,
+                  summary: "The standard card, asked to sit in the middle. Fully open it is centered; in book pose the system moves it into the left half by itself.",
+                  pros: ["The default most people expect", "The system keeps it off the fold in book pose"],
+                  cons: ["In book pose it lands in the left half even though you asked for the middle"],
+                  lookFor: "Open it fully open, then in book pose: it moves from the middle to the left half.",
+                  knobs: ["kind": "sheet", "sizing": "form", "placement": "center"]),
+        LabOption("sheet-full-width", "Cover across the whole display", .avoid,
+                  summary: "iOS will not stretch a sheet across the fold, so the nearest thing is a full-screen cover: it hides everything, fold included.",
+                  pros: ["Most room for content"],
+                  cons: ["Hides everything behind it", "Text and controls run across the fold in book pose",
+                         "Apple advises against presentations that cover most of the window"],
+                  lookFor: "Open it in book pose: rows and the title run over the fold.",
+                  knobs: ["kind": "fullScreen"]),
     ]
 
     static let knobs: [KnobSpec] = [
@@ -47,8 +67,14 @@ enum SheetsLab {
         facts: []),
         KnobSpec("sizing", "Sheet sizing", options: [
             .init("automatic", "Automatic"), .init("form", "Form"), .init("page", "Page"), .init("fitted", "Fitted"),
-        ], note: "presentationSizing picks the card size in regular width. Form is narrower; page is wider.",
+        ], note: "presentationSizing picks the card size in regular width. Form is narrower; page is wider. In book pose every size is kept in one half.",
         facts: ["F-2b"]),
+        KnobSpec("placement", "Sheet placement", options: [
+            .init("automatic", "Automatic"), .init("leading", "Leading"), .init("center", "Center"), .init("trailing", "Trailing"),
+        ], note: "New in iOS 27: a sheet can sit on the leading or trailing edge of the open display. Put it next to what it changes.",
+        facts: []),
+        .toggle("interact", "Use the screen behind",
+                note: "Lets people keep tapping and scrolling the content behind the sheet.", facts: []),
     ]
 }
 
@@ -63,7 +89,11 @@ struct SheetsLabView: View {
 
     var body: some View {
         content
-            .overlay { if isThumbnail { PresentationMock(kind: state["kind"], sizing: state["sizing"]) } }
+            .overlay {
+                if isThumbnail {
+                    PresentationMock(kind: state["kind"], sizing: state["sizing"], placement: state["placement"])
+                }
+            }
     }
 
     private var content: some View {
@@ -134,7 +164,12 @@ struct SheetsLabView: View {
         case "dialog": "Confirmation dialog"
         case "menu": "Menu"
         case "fullScreen": "Full-screen cover"
-        default: state["sizing"] == "page" ? "Page sheet" : state["sizing"] == "form" ? "Form sheet" : "Sheet"
+        default:
+            switch state["sizing"] {
+            case "page": "Page sheet"
+            case "form": state["placement"] == "trailing" ? "Side sheet" : "Form sheet"
+            default: "Sheet"
+            }
         }
     }
 
@@ -145,9 +180,13 @@ struct SheetsLabView: View {
         case "dialog": "A list of actions. It's an action sheet when folded and a floating card when open."
         case "menu": "A list that drops from its button. Try the buttons at the left edge, on the fold and by the rail."
         case "fullScreen": "Covers everything. Use it only for focused tasks."
-        default: state["sizing"] == "page"
-            ? "A wide card on the open display, almost full screen when folded."
-            : "A narrower centered card on the open display, a bottom sheet when folded."
+        default:
+            switch (state["sizing"], state["placement"]) {
+            case ("page", _): "A wide card on the open display, almost full screen when folded."
+            case (_, "trailing"): "A card on the right side of the open display; the left side stays usable. A bottom sheet when folded."
+            case (_, "leading"): "A card on the left side of the open display. A bottom sheet when folded."
+            default: "A narrower centered card on the open display, a bottom sheet when folded."
+            }
         }
     }
 
@@ -187,12 +226,24 @@ struct SheetsLabView: View {
 
     @ViewBuilder
     private var sizedSheet: some View {
-        let body = SheetBody(title: "Sheet").presentationDetents(detents)
+        let body = SheetBody(title: kindTitle)
+            .presentationDetents(detents)
+            .presentationPlacement(placement)
+            .presentationBackgroundInteraction(state.isOn("interact") ? .enabled : .automatic)
         switch state["sizing"] {
         case "form": body.presentationSizing(.form)
         case "page": body.presentationSizing(.page)
         case "fitted": body.presentationSizing(.fitted)
         default: body
+        }
+    }
+
+    private var placement: PresentationPlacement {
+        switch state["placement"] {
+        case "leading": .leading
+        case "center": .center
+        case "trailing": .trailing
+        default: .automatic
         }
     }
 
@@ -230,12 +281,13 @@ private struct SheetBody: View {
 private struct PresentationMock: View {
     let kind: String
     let sizing: String
+    var placement = "automatic"
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
             ZStack {
-                if kind != "menu" && kind != "popover" { Color.black.opacity(0.25) }
+                if kind != "menu" && kind != "popover" && placement != "trailing" { Color.black.opacity(0.25) }
                 switch kind {
                 case "popover":
                     card(width: 300, height: 240).position(x: size.width / 2, y: 120 + 150)
@@ -248,10 +300,20 @@ private struct PresentationMock: View {
                 case "fullScreen":
                     card(width: size.width, height: size.height, radius: 0)
                 default:
-                    let width: CGFloat = sizing == "page" ? min(size.width - 40, 760) : min(size.width - 40, 560)
-                    let height: CGFloat = size.width > 600 ? size.height - 80 : size.height * 0.55
+                    let wide = size.width > 600
+                    let width: CGFloat = switch sizing {
+                    case "page": min(size.width - 40, 760)
+                    default: wide && placement == "trailing" || wide && placement == "leading"
+                        ? min(size.width / 2 - 40, 400) : min(size.width - 40, 560)
+                    }
+                    let height: CGFloat = wide ? size.height - 80 : size.height * 0.55
+                    let x: CGFloat = switch (wide, placement) {
+                    case (true, "trailing"): size.width - width / 2 - 20 - min(84, size.width * 0.09)
+                    case (true, "leading"): width / 2 + 20
+                    default: size.width / 2
+                    }
                     card(width: width, height: height, radius: 26)
-                        .position(x: size.width / 2, y: size.width > 600 ? size.height / 2 : size.height - height / 2)
+                        .position(x: x, y: wide ? size.height / 2 : size.height - height / 2)
                 }
             }
         }

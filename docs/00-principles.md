@@ -14,12 +14,12 @@ Nothing in these docs was measured by the research pass. Measurements quoted com
 
 ## What we do in DuoLab and why
 
-DuoLab already shows ten layout decisions (tab bar, toolbars, list/detail, grids, reading width,
-media, floating overlays, presentations, hinge effects, pitfalls). Those labs cover *where things go
-on each display*. What they don't cover yet is *what happens between displays*: folding mid-task,
-the laptop pose, feedback placement, and motion during a resize. The 12 principles below are the
-spine for both sets. Each one names the lab that shows it today, or the backlog item
-(`07-lab-backlog.md`) that will.
+DuoLab's first ten labs (tab bar, toolbars, list/detail, grids, reading width, media, floating
+overlays, presentations, hinge effects, pitfalls) cover *where things go on each display*. Labs 11–14
+(fold mid-task, laptop pose, motion on fold, toasts and banners) cover *what happens between
+displays*. The 12 principles below are the spine for both sets. Each one names the lab that shows it,
+or the backlog item (`07-lab-backlog.md`) that will. What the simulator showed while building them is
+in `08-findings.md`.
 
 ## The principles
 
@@ -45,7 +45,11 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   restored", playback resumes ([Tier 3 Config_Changes](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3), secondary).
   Samsung: the app should continue "where the user left off", text entry should carry over with the
   keyboard still open ([Samsung foldable design](https://developer.samsung.com/one-ui/largescreen-and-foldable/designing_for_foldable.html), secondary).
-- **Lab.** Not yet. Backlog **B1 Fold mid-task** (top 5).
+- **Lab.** 11 Fold mid-task: state above the layout switch (Recommended) vs state inside each layout,
+  rebuilt on every fold, and rebuild-then-restore.
+
+![Fold mid-task, open and folded](images/continuity.png)
+*Same note before and after folding: the selected row, typed text with the cursor, and the voice memo progress carry over.*
 
 ### P3. Small moves beat rearrangement
 - **Rule.** When the device folds, move only what must move to stay visible and tappable. Move related
@@ -88,7 +92,9 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   the default bar placement"; "Items overflow from bottom to top by default"; `toolbarVerticalBehavior`
   docs: "Treat it as a stable choice: avoid changing it frequently as the user navigates"
   ([doc](https://developer.apple.com/documentation/swiftui/view/toolbarverticalbehavior(_:)), verified).
-- **Lab.** 01 Tab bar, 02 Toolbars. Backlog **B6 Bar compression** extends it.
+- **Lab.** 01 Tab bar, 02 Toolbars, including the bar-compression options ("Browse screen: actions give
+  way", "Task screen: tabs give way", "Keep frequent actions longest", and the Avoids "Own more menu"
+  and "Text-only actions").
 
 ### P7. Respect each safe-area edge and each reserved region separately
 - **Rule.** Size from the container, inset by each edge independently, and query `ReservedRegion` for
@@ -107,7 +113,7 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   "Just make sure your hierarchy doesn't change between the outer and inner displays"
   ([111466](https://developer.apple.com/videos/play/tech-talks/111466/), verified). Google's list-detail
   canonical layout defines exactly what to keep visible when it collapses ([canonical layouts](https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts), secondary).
-- **Lab.** 03 List and detail. Backlog **B3 Collapse rules** covers the fold moment.
+- **Lab.** 03 List and detail. Backlog **B3 Collapse rules** (in progress, round 3) covers the fold moment.
 
 ### P9. Laptop pose is optional, and when you do it: view up, controls down, same controls
 - **Rule.** With the inner display in portrait and half folded on a table, put the thing people watch
@@ -120,7 +126,8 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   the bottom ([OverlayArrangementViewStyle](https://developer.apple.com/documentation/swiftui/overlayarrangementviewstyle), verified).
   Samsung Flex mode ("View on top, Control on the bottom"), Android tabletop posture and Microsoft's
   laptop posture are the same idea (secondary).
-- **Lab.** Partly 06 Media (`ArrangementView` split). Backlog **B2 Laptop pose** (top 5).
+- **Lab.** 12 Laptop pose ("Video up, controls down" with the overlay arrangement), plus 06 Media for the
+  split arrangement. The simulator can't produce a laptop pose, so lab 12 draws a simulated fold.
 
 ### P10. The hinge angle drives effects, not layout
 - **Rule.** Use `onHingeChange` / `UIHingeInteraction` for playful or expressive effects (a page curl,
@@ -130,7 +137,8 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   use the arrangement and region APIs" ([111464](https://developer.apple.com/videos/play/tech-talks/111464/), verified).
   Google does not even expose an angle: "animations or logic based on the precise hinge angle must be
   tuned to the device" ([fold-aware](https://developer.android.com/develop/ui/compose/layouts/adaptive/foldables/make-your-app-fold-aware), secondary).
-- **Lab.** 09 Hinge (effects). Backlog **B9 Hinge effect hygiene** adds reduce-motion and smoothing.
+- **Lab.** 09 Hinge: the effects, plus "Angle drives the effect only" (Recommended), "Angle decides the
+  layout" (Avoid), "Light tap at each pose" and "With Reduce Motion".
 
 ### P11. Animate the change of arrangement, not every geometry tick
 - **Rule.** Animate discrete changes (split ↔ stack, column count, a panel appearing at the fold) with a
@@ -141,7 +149,8 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   "A visual transition effect is strongly recommended when the layout changes" for Flex mode (secondary).
   Measured: a fold delivers intermediate geometry (`research/on-device-measurements.md`), so animating
   on raw geometry animates through a wrong frame (our view).
-- **Lab.** Not yet. Backlog **B4 Motion on fold** (top 5).
+- **Lab.** 13 Motion on fold: animate the layout switch only, no animation, animate every size change,
+  Reduce Motion crossfade.
 
 ### P12. Feedback stays near its content and goes where the eye goes next
 - **Rule.** Prefer inline status. For transient confirmations (a toast), place them inside the safe area,
@@ -153,7 +162,10 @@ spine for both sets. Each one names the lab that shows it today, or the backlog 
   propped on a table the same alert moves to the top region ([111463](https://developer.apple.com/videos/play/tech-talks/111463/), verified).
   Apple has no toast component (verified by absence); Microsoft's foldable snackbar shows on one screen
   only (secondary). Placement rules for toasts are our view, see `03-presentations-and-feedback.md`.
-- **Lab.** 08 Presentations (system alerts, menus). Backlog **B5 Toasts and banners** (top 5).
+- **Lab.** 08 Presentations (system alerts, menus), 14 Toasts and banners.
+
+![Toasts and banners, open and folded](images/toasts.png)
+*"Pill in the pane": the "Saved" pill is centred in the detail pane it came from, not on the window, on both displays.*
 
 ## Things we deliberately don't make principles
 

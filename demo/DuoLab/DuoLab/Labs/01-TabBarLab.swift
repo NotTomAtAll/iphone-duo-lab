@@ -6,7 +6,7 @@ enum TabBarLab {
                   summary: "The standard tab bar. It stands upright beside your content and moves by itself in every pose.",
                   pros: ["Adapts to every pose with no extra work", "Glass look, a search tab and a separate create button for free", "Your content makes room for it automatically"],
                   cons: ["No long-press or double-tap on tab items", "Badge and title styling is the system's"],
-                  lookFor: "Fold and unfold. The bar moves from the trailing rail to the bottom of the inner display."),
+                  lookFor: "Fold and unfold. The bar stays upright in the trailing strip on both displays; the content next to it resizes."),
         LabOption("sidebar", "Sidebar when open", .consider,
                   summary: "Tabs turn into a sidebar on the big display and back into tabs when folded.",
                   pros: ["Room for more sections and pinned content", "Feels at home on the large display"],
