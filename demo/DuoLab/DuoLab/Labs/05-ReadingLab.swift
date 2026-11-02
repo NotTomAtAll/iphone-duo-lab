@@ -46,6 +46,16 @@ struct ReadingLabView: View {
     let state: KnobState
 
     private var maxWidth: CGFloat { CGFloat(Double(state["width"]) ?? .infinity) }
+    /// The width the text column really gets, which is less than the cap on a narrow window.
+    @State private var columnWidth: CGFloat = 0
+
+    private var columnText: String {
+        let full = state["width"] == "full"
+        // Before the first layout pass (thumbnails can be captured then) only the cap is known.
+        guard columnWidth > 0 else { return full ? "Column: full width" : "Column: up to \(state["width"]) pt" }
+        let now = "\(Int(columnWidth.rounded())) pt"
+        return full ? "Column: full width, \(now)" : "Column: \(now), up to \(state["width"]) pt"
+    }
 
     var body: some View {
         NavigationStack {
@@ -58,6 +68,7 @@ struct ReadingLabView: View {
                         if state["content"] == "form" { form } else { article }
                     }
                     .frame(maxWidth: maxWidth, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
                     .frame(maxWidth: .infinity)
                 }
                 .padding()
@@ -71,7 +82,7 @@ struct ReadingLabView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(state["content"] == "form" ? "Account details" : "Field notes from the harbor")
                 .font(.largeTitle.bold())
-            Text("Column: \(state["width"] == "full" ? "full width" : "\(state["width"]) pt")")
+            Text(columnText)
                 .font(.subheadline).foregroundStyle(.secondary)
         }
     }

@@ -205,14 +205,20 @@ private struct EffectDrawing: View {
                 Image(systemName: "lamp.desk.fill").font(.system(size: 90)).foregroundStyle(.yellow.opacity(0.4 + 0.6 * t))
             }
         case "tilt":
+            // The near edge of a tilted card projects wider than its frame: scaled down so it
+            // stays inside the frame at every angle.
             Tile(index: 7)
                 .rotation3DEffect(.degrees((1 - t) * 60), axis: (x: 1, y: 0, z: 0), perspective: 0.6)
+                .scaleEffect(0.74)
                 .shadow(radius: 20 * t)
         default:
+            // Pages swung toward the viewer project taller than their frame: scaled down so they
+            // never reach the readout above.
             HStack(spacing: 0) {
                 page(index: 1).rotation3DEffect(.degrees((1 - t) * 80), axis: (x: 0, y: 1, z: 0), anchor: .trailing, perspective: 0.5)
                 page(index: 2).rotation3DEffect(.degrees(-(1 - t) * 80), axis: (x: 0, y: 1, z: 0), anchor: .leading, perspective: 0.5)
             }
+            .scaleEffect(0.8)
         }
     }
 
@@ -249,7 +255,7 @@ private struct HingeScreen<Header: View, Controls: View>: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
                         ForEach(0..<12, id: \.self) { index in
                             HStack(spacing: 12) {
-                                Tile(index: index).frame(width: 56, height: 56)
+                                Tile(index: index, showsCaption: false).frame(width: 56, height: 56)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(Placeholder.name(index)).font(.headline)
                                     Text(Placeholder.sentence).font(.caption).foregroundStyle(.secondary).lineLimit(2)

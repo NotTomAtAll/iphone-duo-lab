@@ -35,6 +35,8 @@ final class ThumbnailRenderer {
     /// Window slots with no worker on them. Each worker keeps its slot (and window) for life.
     @ObservationIgnored private var freeSlots: Set<Int> = [0, 1]
     @ObservationIgnored private var windows: [Int: UIWindow] = [:]
+    /// Until when workers wait before their next job (see `hold`).
+    @ObservationIgnored private var heldUntil = ContinuousClock.now
     @ObservationIgnored private let log = Logger(subsystem: "duolab", category: "thumbnails")
     @ObservationIgnored private let directory: URL = {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
@@ -92,6 +94,12 @@ final class ThumbnailRenderer {
         startWorkers()
     }
 
+    /// Pauses background rendering for a moment, e.g. while a full-screen option arrives: each
+    /// render shows a window and forces a screen update, which slows the arrival down.
+    func hold(for duration: Duration) {
+        heldUntil = max(heldUntil, ContinuousClock.now + duration)
+    }
+
     private func startWorkers() {
         while !queue.isEmpty, let slot = freeSlots.min() {
             freeSlots.remove(slot)
@@ -101,6 +109,10 @@ final class ThumbnailRenderer {
 
     private func work(slot: Int) async {
         while !queue.isEmpty {
+            while ContinuousClock.now < heldUntil {
+                try? await Task.sleep(until: heldUntil)
+            }
+            guard !queue.isEmpty else { break }
             let job = queue.removeFirst()
             guard images[job.key] == nil, !inFlight.contains(job.key) else { continue }
             inFlight.insert(job.key)

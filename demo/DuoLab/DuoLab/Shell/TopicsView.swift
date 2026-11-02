@@ -17,15 +17,17 @@ struct TopicsView: View {
             if sizeClass == .regular { split } else { stack }
         }
         .fullScreenCover(item: Bindable(router).preview) { target in
+            // Keyed on the target: a link that swaps the option without a transition (see
+            // `AppRouter.handle`) keeps the cover up, and must still get a fresh screen.
             switch target.entrance {
             case .zoom:
-                PreviewScreen(target: target)
+                PreviewScreen(target: target).id(target)
                     .navigationTransition(.zoom(sourceID: target.id, in: zoom))
             case .fade:
-                PreviewScreen(target: target)
+                PreviewScreen(target: target).id(target)
                     .presentationBackground(.clear)
             case .system:
-                PreviewScreen(target: target)
+                PreviewScreen(target: target).id(target)
             }
         }
     }
@@ -161,7 +163,7 @@ private struct TopicRow: View {
                 .frame(width: 112)
             VStack(alignment: .leading, spacing: 3) {
                 Text(lab.title).font(.headline)
-                Text(lab.question).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                Text(lab.question).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
                 Text("\(lab.options.count) options").font(.caption).foregroundStyle(.tertiary)
             }
         }

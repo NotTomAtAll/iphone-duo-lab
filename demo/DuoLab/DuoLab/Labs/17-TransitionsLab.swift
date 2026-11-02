@@ -108,17 +108,65 @@ struct TransitionsLabView: View {
     private var heroAnimation: Animation { .smooth(duration: slow ? 2.4 : 0.4) }
 
     private var grid: some View {
-        GeometryReader { proxy in
-            let count = max(2, Int(proxy.size.width / 150) / 2 * 2)
+        RegionReader { size, folds, _ in
             ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: count), spacing: 8) {
-                    ForEach(0..<24, id: \.self) { index in
-                        Button { open(index) } label: { tile(index) }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("photo-\(index)")
-                    }
+                if let fold = splitFold(folds, size: size) {
+                    split(size: size, fold: fold)
+                } else {
+                    photoGrid(Array(0..<photoCount), columns: max(2, Int(size.width / 150) / 2 * 2))
+                        .padding(gridMargin)
                 }
-                .padding(12)
+            }
+        }
+    }
+
+    private let photoCount = 24
+    private let gridSpacing: CGFloat = 8
+    private let gridMargin: CGFloat = 12
+
+    /// A vertical fold well inside the window: the grid splits around it so a gutter, not a photo, sits on it.
+    private func splitFold(_ folds: [CGRect], size: CGSize) -> CGRect? {
+        guard let fold = folds.first(where: { $0.height > $0.width }),
+              fold.minX > gridMargin * 2, fold.maxX < size.width - gridMargin * 2 else { return nil }
+        return fold
+    }
+
+    /// One grid each side of the fold. The narrower side sets the column count and tile size for
+    /// both, so rows line up. Reading order runs across both sides, row by row, and every photo
+    /// keeps its own zoom source, whichever side it lands on.
+    private func split(size: CGSize, fold: CGRect) -> some View {
+        let half = gridSpacing / 2
+        let leftWidth = fold.minX - gridMargin - half
+        let rightWidth = size.width - fold.maxX - gridMargin - half
+        let narrow = min(leftWidth, rightWidth)
+        let side = max(1, Int((narrow + gridSpacing) / (150 + gridSpacing)))
+        let tile = max((narrow - CGFloat(side - 1) * gridSpacing) / CGFloat(side), 1)
+        let perRow = side * 2
+        let rows = (photoCount + perRow - 1) / perRow
+        let left = (0..<rows).flatMap { row in (0..<side).map { row * perRow + $0 } }.filter { $0 < photoCount }
+        let right = (0..<rows).flatMap { row in (0..<side).map { row * perRow + side + $0 } }.filter { $0 < photoCount }
+        let item = GridItem(.fixed(tile), spacing: gridSpacing)
+        return HStack(alignment: .top, spacing: 0) {
+            photoGrid(left, columns: side, item: item)
+                .frame(width: leftWidth, alignment: .trailing)
+                .padding(.leading, gridMargin)
+                .padding(.trailing, half)
+            Color.clear.frame(width: fold.width)
+            photoGrid(right, columns: side, item: item)
+                .frame(width: rightWidth, alignment: .leading)
+                .padding(.leading, half)
+                .padding(.trailing, gridMargin)
+        }
+        .padding(.vertical, gridMargin)
+    }
+
+    private func photoGrid(_ indices: [Int], columns: Int, item: GridItem? = nil) -> some View {
+        LazyVGrid(columns: Array(repeating: item ?? GridItem(.flexible(), spacing: gridSpacing), count: columns),
+                  spacing: gridSpacing) {
+            ForEach(indices, id: \.self) { index in
+                Button { open(index) } label: { tile(index) }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("photo-\(index)")
             }
         }
     }

@@ -120,10 +120,11 @@ private struct VideoStandIn: View {
                         .fixedSize()
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(.red, in: .capsule)
-                    Spacer(minLength: 8)
+                    // Both on the leading side: the trailing edge is where the lab's handle lives.
                     Text("1.2k watching").font(.caption)
                         .lineLimit(1)
                         .fixedSize()
+                    Spacer(minLength: 8)
                 }
                 Spacer()
                 Image(systemName: "play.circle.fill").font(.system(size: 64))

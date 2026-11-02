@@ -141,18 +141,24 @@ private struct ContinuityDemo: View {
     private var branch: NotesBranch { sizeClass == .regular ? .regular : .compact }
     private var initial: NotesState { seeded ? NotesState() : seed }
 
+    private var checklist: ChecklistSlot {
+        ChecklistSlot(probe: probe, sheetTracked: seed.sheet,
+                      example: isThumbnail ? ChecklistCard.example(strategy) : nil)
+    }
+
     var body: some View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
-                // Its own row above the screen, so it never covers the note; kept left of the fold.
-                ChecklistCard(probe: probe, sheetTracked: seed.sheet,
-                              example: isThumbnail ? ChecklistCard.example(strategy) : nil)
-                    .frame(maxWidth: 420, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.bar)
+                // Folded: its own row above the screen, so it never covers the note. The trailing
+                // 60 pt stay free for the lab's handle. Two panes put it in the list pane instead.
+                if branch == .compact {
+                    ChecklistStrip(slot: checklist)
+                        .padding(.trailing, 60)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.bar)
+                }
             }
+            .environment(\.notesChecklist, checklist)
             .onAppear { seeded = true }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
                 probe.keyboardUp = true
@@ -269,6 +275,7 @@ private struct NotesLayout: View {
     let branch: NotesBranch
     @Binding var notes: NotesState
     let probe: ContinuityProbe
+    @Environment(\.notesChecklist) private var checklist
 
     var body: some View {
         Group {
@@ -299,6 +306,12 @@ private struct NotesLayout: View {
                     NotesList(notes: $notes)
                         .navigationTitle("Notes")
                         .navigationBarTitleDisplayMode(.inline)
+                        // In the list pane only, before the fold, so the note stays uncovered.
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            if let checklist {
+                                ChecklistStrip(slot: checklist).background(.bar)
+                            }
+                        }
                 }
                 .frame(width: listWidth)
                 Divider()
@@ -469,6 +482,29 @@ private struct NoteOptionsSheet: View {
 
 // MARK: - Checklist
 
+/// What the checklist needs, handed down so two panes can show it in the list pane.
+struct ChecklistSlot {
+    let probe: ContinuityProbe
+    let sheetTracked: Bool
+    let example: [Bool]?
+}
+
+extension EnvironmentValues {
+    @Entry var notesChecklist: ChecklistSlot? = nil
+}
+
+private struct ChecklistStrip: View {
+    let slot: ChecklistSlot
+
+    var body: some View {
+        ChecklistCard(probe: slot.probe, sheetTracked: slot.sheetTracked, example: slot.example)
+            .frame(maxWidth: 420, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct ChecklistCard: View {
     let probe: ContinuityProbe
     let sheetTracked: Bool
@@ -511,9 +547,10 @@ private struct ChecklistCard: View {
             .buttonStyle(.plain)
             .accessibilityHint(expanded ? "Hides the details" : "Shows each item")
             if expanded {
-                Text(subtitle).font(.caption2).foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                          alignment: .leading, spacing: 3) {
+                Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                // Two rows of three, so the open card stays short.
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .topLeading), count: 3),
+                          alignment: .leading, spacing: 4) {
                     ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
                         row(item, outcome: outcome(index))
                     }
@@ -530,7 +567,7 @@ private struct ChecklistCard: View {
     private var title: String {
         if example != nil { return "After a fold (example)" }
         if probe.pending { return "Checking…" }
-        return probe.before == nil ? "Checklist: fold or unfold now" : "After the last fold"
+        return probe.before == nil ? "Fold or unfold now" : "After the last fold"
     }
 
     private var subtitle: String {
@@ -552,7 +589,7 @@ private struct ChecklistCard: View {
             if !before.focused { return after.focused ? .lost : .skipped("not typing") }
             guard after.focused else { return .lost }
             // Only a keyboard that is actually up counts as kept.
-            return probe.keyboardAfter ? .kept : .partial("focus kept, keyboard closed")
+            return probe.keyboardAfter ? .kept : .partial("no keyboard")
         case 4: return abs(before.progressStart.timeIntervalSince(after.progressStart)) < 0.5 ? .kept : .lost
         default: return before.sheet == after.sheet ? .kept : .lost
         }
@@ -572,7 +609,7 @@ private struct ChecklistCard: View {
         HStack(spacing: 5) {
             icon(outcome)
             VStack(alignment: .leading, spacing: 0) {
-                Text(item).font(.caption2)
+                Text(item).font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
                 switch outcome {
                 case .lost: Text("lost").font(.caption2.weight(.semibold)).foregroundStyle(.red)
                 case .partial(let note): Text(note).font(.caption2.weight(.semibold)).foregroundStyle(.orange)

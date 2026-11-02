@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// An option opened full screen, with optional knob overrides from a link.
 struct PreviewTarget: Identifiable, Hashable {
@@ -97,17 +98,25 @@ final class AppRouter {
         if let measure = link.measure { self.measure = measure }
         if let tab = link.tab { self.tab = tab }
         if let lab = link.lab {
-            path = [lab]
-            if let optionID = link.option {
-                if let option = lab.option(optionID) {
-                    let preset = KnobState(lab: lab, values: option.knobs)
-                    problems += preset.apply(link.knobs)
-                    preview = PreviewTarget(lab: lab, optionID: option.id, knobs: link.knobs)
-                } else {
-                    problems.append("\(lab.title) has no option “\(optionID)”")
+            // A link lands without any transition: no push animation and no cover slide. Any
+            // presentation still in flight makes UIKit drop touches, so an animated arrival (push
+            // under the cover's slide, slower still while the first thumbnails render) left the
+            // lab bar ignoring taps right when a shared link is first opened.
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
+                path = [lab]
+                if let optionID = link.option {
+                    if let option = lab.option(optionID) {
+                        let preset = KnobState(lab: lab, values: option.knobs)
+                        problems += preset.apply(link.knobs)
+                        preview = PreviewTarget(lab: lab, optionID: option.id, knobs: link.knobs)
+                    } else {
+                        problems.append("\(lab.title) has no option “\(optionID)”")
+                    }
+                } else if !link.knobs.isEmpty {
+                    problems.append("Knob values need an option")
                 }
-            } else if !link.knobs.isEmpty {
-                problems.append("Knob values need an option")
             }
         }
         if let tour = link.tour, let problem = startTour(tour) { problems.append(problem) }

@@ -188,6 +188,8 @@ private struct MotionDemo: View {
             }
             .padding(16)
         }
+        // The last row can scroll clear of the compose button.
+        .contentMargins(.bottom, 80, for: .scrollContent)
     }
 
     @ViewBuilder
@@ -229,11 +231,12 @@ private struct Geometry {
         return count % 2 == 0 ? count : count - 1
     }
 
-    /// Folded: centred above the bottom bar. Open: the list pane's corner, clear of the fold.
+    /// Folded: the bottom-trailing corner, where it sits over a tile's empty corner, not its
+    /// caption. Open: the list pane's corner, clear of the fold.
     func composePoint(_ layout: MotionLayout) -> CGPoint {
         let y = size.height - 140
         switch layout {
-        case .stacked: return CGPoint(x: size.width / 2, y: y)
+        case .stacked: return CGPoint(x: size.width - 16 - 30, y: size.height - 16 - 30)
         case .split: return CGPoint(x: listWidth - 16 - 30, y: y)
         }
     }

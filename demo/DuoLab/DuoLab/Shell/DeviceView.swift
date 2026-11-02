@@ -7,18 +7,35 @@ struct DeviceView: View {
     /// right the moment it appears, not only after the next fold.
     private var hinge: HingeReading { router.hinge }
     @AppStorage(ReachOverlay.storageKey) private var showsReach = false
+    /// Where each card sits in the scroll view, and the card the user last scrolled to.
+    @State private var anchors = ScrollAnchors()
 
     var body: some View {
         NavigationStack {
             EnvironmentProbe { snapshot in
-                // One ScrollView whatever the pose, so folding keeps its identity (and offset).
-                ScrollView {
-                    columns(snapshot)
-                        .padding(20)
+                // One ScrollView whatever the pose, so folding keeps its identity. The offset alone
+                // means nothing once one column becomes two, so a fold brings the card that was at
+                // the top back to the top.
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        columns(snapshot)
+                            .padding(20)
+                    }
+                    .coordinateSpace(.named(ScrollAnchors.space))
+                    .safeAreaPadding(.init(top: snapshot.safeArea.top, leading: snapshot.safeArea.leading,
+                                           bottom: snapshot.safeArea.bottom, trailing: snapshot.safeArea.trailing))
+                    .background(Color(.systemGroupedBackground))
+                    .onScrollPhaseChange { _, phase in
+                        if phase == .idle { anchors.commit() }
+                    }
+                    .onChange(of: snapshot.horizontal) {
+                        guard let card = anchors.committed else { return }
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(60))
+                            proxy.scrollTo(card, anchor: .top)
+                        }
+                    }
                 }
-                .safeAreaPadding(.init(top: snapshot.safeArea.top, leading: snapshot.safeArea.leading,
-                                       bottom: snapshot.safeArea.bottom, trailing: snapshot.safeArea.trailing))
-                .background(Color(.systemGroupedBackground))
             }
             .navigationTitle("Device")
         }
@@ -43,28 +60,28 @@ struct DeviceView: View {
             let gap = fold.width + 20
             HStack(alignment: .top, spacing: gap) {
                 VStack(alignment: .leading, spacing: 20) {
-                    intro
-                    windowCard(s)
-                    safeAreaCard(s)
-                    overlaysCard
+                    intro.scrollAnchor("intro", in: anchors)
+                    windowCard(s).scrollAnchor("window", in: anchors)
+                    safeAreaCard(s).scrollAnchor("safeArea", in: anchors)
+                    overlaysCard.scrollAnchor("overlays", in: anchors)
                 }
                 .frame(width: max(fold.minX - 10 - start, 200))
                 VStack(alignment: .leading, spacing: 20) {
-                    hingeCard
-                    regionsCard(s)
-                    reachCard(s)
+                    hingeCard.scrollAnchor("hinge", in: anchors)
+                    regionsCard(s).scrollAnchor("regions", in: anchors)
+                    reachCard(s).scrollAnchor("reach", in: anchors)
                 }
                 .frame(width: max(end - fold.maxX - 10, 200))
             }
         } else {
             VStack(alignment: .leading, spacing: 20) {
-                intro
-                windowCard(s)
-                safeAreaCard(s)
-                hingeCard
-                regionsCard(s)
-                overlaysCard
-                reachCard(s)
+                intro.scrollAnchor("intro", in: anchors)
+                windowCard(s).scrollAnchor("window", in: anchors)
+                safeAreaCard(s).scrollAnchor("safeArea", in: anchors)
+                hingeCard.scrollAnchor("hinge", in: anchors)
+                regionsCard(s).scrollAnchor("regions", in: anchors)
+                overlaysCard.scrollAnchor("overlays", in: anchors)
+                reachCard(s).scrollAnchor("reach", in: anchors)
             }
         }
     }
@@ -231,5 +248,33 @@ private struct HingeGauge: View {
                 .stroke(.tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
         }
         .padding(.top, 30)
+    }
+}
+
+/// Remembers which card is nearest the top of the Device tab's scroll view.
+@MainActor
+final class ScrollAnchors {
+    static let space = "device-scroll"
+    /// Each card's top edge in the scroll view's visible frame (content offset applied).
+    private var tops: [String: CGFloat] = [:]
+    /// The card at the top when the user last stopped scrolling.
+    private(set) var committed: String?
+
+    func update(_ id: String, top: CGFloat) { tops[id] = top }
+
+    /// The card whose top is closest to the top edge, preferring one that has not scrolled past it.
+    func commit() {
+        let visible = tops.filter { $0.value > -120 }
+        committed = visible.min { abs($0.value) < abs($1.value) }?.key
+        if committed == "intro" { committed = nil }
+    }
+}
+
+extension View {
+    func scrollAnchor(_ id: String, in anchors: ScrollAnchors) -> some View {
+        self.id(id)
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(ScrollAnchors.space)).minY } action: {
+                anchors.update(id, top: $0)
+            }
     }
 }
