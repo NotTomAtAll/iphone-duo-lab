@@ -2,37 +2,19 @@ import SwiftUI
 
 /// What the device hands the app right now: window, safe area, hinge, reserved regions.
 struct DeviceView: View {
-    @State private var hinge = HingeReading.unknown
     @Environment(AppRouter.self) private var router
+    /// The app-wide last reading (seeded at launch, kept current from the root), so this tab is
+    /// right the moment it appears, not only after the next fold.
+    private var hinge: HingeReading { router.hinge }
     @AppStorage(ReachOverlay.storageKey) private var showsReach = false
 
     var body: some View {
-        @Bindable var router = router
         NavigationStack {
             EnvironmentProbe { snapshot in
+                // One ScrollView whatever the pose, so folding keeps its identity (and offset).
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("Fold and unfold the device and watch these values change. They are read live; nothing here is cached.")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: 640, alignment: .leading)
-                        LazyVGrid(columns: evenColumns(for: snapshot.size.width - snapshot.safeArea.leading - snapshot.safeArea.trailing - 40,
-                                                       minimum: 320, spacing: 20),
-                                  alignment: .leading, spacing: 20) {
-                            windowCard(snapshot)
-                            safeAreaCard(snapshot)
-                            hingeCard
-                            regionsCard(snapshot)
-                        }
-                        Toggle(isOn: $router.measure) {
-                            Label("Show the measure overlay everywhere", systemImage: "ruler")
-                        }
-                        .padding(16)
-                        .card()
-                        .frame(maxWidth: 520)
-                        reachCard(snapshot)
-                            .frame(maxWidth: 520)
-                    }
-                    .padding(20)
+                    columns(snapshot)
+                        .padding(20)
                 }
                 .safeAreaPadding(.init(top: snapshot.safeArea.top, leading: snapshot.safeArea.leading,
                                        bottom: snapshot.safeArea.bottom, trailing: snapshot.safeArea.trailing))
@@ -40,7 +22,64 @@ struct DeviceView: View {
             }
             .navigationTitle("Device")
         }
-        .onHingeChange { _, new in withAnimation(.smooth) { hinge = HingeReading(new) } }
+        .animation(.smooth, value: router.hinge)
+    }
+
+    private var intro: some View {
+        Text("Fold and unfold the device and watch these values change. They are read live; nothing here is cached.")
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: 640, alignment: .leading)
+    }
+
+    /// Folded: one column. Open or book: two columns whose gutter is the fold itself, so no card,
+    /// toggle or paragraph straddles it. The gutter comes from the active fold region in book pose,
+    /// and from the window's middle (where the fold is) when the device is flat open.
+    @ViewBuilder
+    private func columns(_ s: EnvironmentSnapshot) -> some View {
+        if s.horizontal == .regular {
+            let fold = s.fold ?? CGRect(x: s.size.width / 2 - 20, y: 0, width: 40, height: s.size.height)
+            let start = s.safeArea.leading + 20
+            let end = s.size.width - s.safeArea.trailing - 20
+            let gap = fold.width + 20
+            HStack(alignment: .top, spacing: gap) {
+                VStack(alignment: .leading, spacing: 20) {
+                    intro
+                    windowCard(s)
+                    safeAreaCard(s)
+                    overlaysCard
+                }
+                .frame(width: max(fold.minX - 10 - start, 200))
+                VStack(alignment: .leading, spacing: 20) {
+                    hingeCard
+                    regionsCard(s)
+                    reachCard(s)
+                }
+                .frame(width: max(end - fold.maxX - 10, 200))
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 20) {
+                intro
+                windowCard(s)
+                safeAreaCard(s)
+                hingeCard
+                regionsCard(s)
+                overlaysCard
+                reachCard(s)
+            }
+        }
+    }
+
+    /// Both switches in one card that sits wholly in one half.
+    private var overlaysCard: some View {
+        @Bindable var router = router
+        return InfoCard(title: "Overlays", symbol: "square.on.square.dashed") {
+            Toggle(isOn: $router.measure) {
+                Label("Measurements on every screen", systemImage: "ruler")
+            }
+            Toggle(isOn: $showsReach) {
+                Label("Thumb reach zones on every screen", systemImage: "hand.point.up.left")
+            }
+        }
     }
 
     private func windowCard(_ s: EnvironmentSnapshot) -> some View {
@@ -84,7 +123,6 @@ struct DeviceView: View {
 
     private func reachCard(_ s: EnvironmentSnapshot) -> some View {
         InfoCard(title: "Reach", symbol: "hand.point.up.left") {
-            Toggle("Show thumb reach zones everywhere", isOn: $showsReach)
             HStack(spacing: 8) {
                 ForEach(ReachOverlay.Band.allCases, id: \.self) { band in
                     HStack(spacing: 4) {

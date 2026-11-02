@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum ContinuityLab {
     static let options: [LabOption] = [
@@ -24,7 +25,7 @@ enum ContinuityLab {
                   summary: "The whole screen is tied to the display size, so a fold makes a brand-new screen.",
                   pros: [],
                   cons: ["Everything resets, even what lives above the layout", "Easy to add by accident while fixing a layout bug"],
-                  lookFor: "Fold with the sheet open: it closes and every checklist item gets a cross.",
+                  lookFor: "Fold with the sheet open: it closes and the checklist fills with crosses.",
                   knobs: ["state": "identity", "sheet": "on"], highlight: "sheet"),
     ]
 
@@ -73,6 +74,10 @@ final class ContinuityProbe {
     private(set) var pending = false
     private(set) var change = ""
     var hinge = ""
+    /// Whether the keyboard is on screen right now, from the system's keyboard notifications.
+    var keyboardUp = false
+    /// The keyboard as it was when the check ran, so "focus kept" is not claimed for a closed keyboard.
+    private(set) var keyboardAfter = false
 
     func report(_ branch: NotesBranch, _ notes: NotesState) {
         latest[branch] = Report(notes: notes, time: .now)
@@ -94,6 +99,7 @@ final class ContinuityProbe {
             guard let self, !Task.isCancelled else { return }
             // Every layout reports when it appears, so this is the layout now on screen.
             self.after = self.latest[new]?.notes
+            self.keyboardAfter = self.keyboardUp
             self.pending = false
         }
     }
@@ -137,17 +143,23 @@ private struct ContinuityDemo: View {
 
     var body: some View {
         content
-            .overlay(alignment: .topLeading) {
-                RegionReader { _, folds, _ in
-                    let room = (folds.first?.minX ?? .infinity) - 24
-                    ChecklistCard(probe: probe, sheetTracked: seed.sheet,
-                                  example: isThumbnail ? ChecklistCard.example(strategy) : nil)
-                        .frame(width: min(200, room))
-                        .padding(.leading, 12)
-                        .padding(.top, 56)
-                }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // Its own row above the screen, so it never covers the note; kept left of the fold.
+                ChecklistCard(probe: probe, sheetTracked: seed.sheet,
+                              example: isThumbnail ? ChecklistCard.example(strategy) : nil)
+                    .frame(maxWidth: 420, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.bar)
             }
             .onAppear { seeded = true }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                probe.keyboardUp = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                probe.keyboardUp = false
+            }
             .onChange(of: sizeClass) { old, new in
                 probe.begin(from: old == .regular ? .regular : .compact, to: new == .regular ? .regular : .compact)
             }
@@ -449,7 +461,8 @@ private struct NoteOptionsSheet: View {
             .navigationTitle("Note options")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium, .large])
+        // Medium only, and the content behind stays usable, so the lab's own controls stay in reach.
+        .presentationDetents([.medium])
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
 }
@@ -461,9 +474,17 @@ private struct ChecklistCard: View {
     let sheetTracked: Bool
     /// Thumbnails can't fold, so they show the result this option produces.
     let example: [Bool]?
-    @State private var collapsed = false
+    @State private var expanded = false
 
     private static let items = ["Selected row", "Scroll position", "Typed text", "Keyboard focus", "Progress", "Sheet"]
+
+    enum Outcome: Equatable {
+        case unchecked, kept, lost
+        /// Kept in part, with what is missing.
+        case partial(String)
+        /// Not part of this test, with why.
+        case skipped(String)
+    }
 
     static func example(_ strategy: String) -> [Bool] {
         switch strategy {
@@ -475,32 +496,41 @@ private struct ChecklistCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Button { withAnimation(.snappy) { collapsed.toggle() } } label: {
-                HStack {
+            Button { withAnimation(.snappy) { expanded.toggle() } } label: {
+                HStack(spacing: 6) {
                     Image(systemName: "checklist")
-                    Text(title).font(.caption.weight(.semibold))
-                    Spacer(minLength: 0)
-                    Image(systemName: collapsed ? "chevron.down" : "chevron.up").font(.caption2)
+                    Text(title).font(.caption.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    HStack(spacing: 2) {
+                        ForEach(Self.items.indices, id: \.self) { index in icon(outcome(index)).font(.caption2) }
+                    }
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption2)
                 }
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            if !collapsed {
+            .accessibilityHint(expanded ? "Hides the details" : "Shows each item")
+            if expanded {
                 Text(subtitle).font(.caption2).foregroundStyle(.secondary)
-                ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
-                    row(item, result: result(index))
+                LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+                          alignment: .leading, spacing: 3) {
+                    ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
+                        row(item, outcome: outcome(index))
+                    }
                 }
             }
         }
-        .padding(8)
-        .background(.ultraThinMaterial.opacity(0.92), in: .rect(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.15)))
-        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .onAppear { if example != nil { expanded = true } }
+        .onChange(of: probe.pending) { _, pending in
+            // Show the details when a fold's results come in.
+            if !pending, probe.before != nil { withAnimation(.snappy) { expanded = true } }
+        }
     }
 
     private var title: String {
         if example != nil { return "After a fold (example)" }
         if probe.pending { return "Checking…" }
-        return probe.before == nil ? "Fold or unfold now" : "After the last fold"
+        return probe.before == nil ? "Checklist: fold or unfold now" : "After the last fold"
     }
 
     private var subtitle: String {
@@ -509,30 +539,47 @@ private struct ChecklistCard: View {
         return probe.change + (probe.hinge.isEmpty ? "" : " · hinge \(probe.hinge)")
     }
 
-    /// nil = not checked yet.
-    private func result(_ index: Int) -> Bool? {
-        if index == 5, !sheetTracked { return nil }
-        if let example { return example[index] }
-        guard !probe.pending, let before = probe.before else { return nil }
-        guard let after = probe.after else { return false }
+    private func outcome(_ index: Int) -> Outcome {
+        if index == 5, !sheetTracked { return .skipped("not open") }
+        if let example { return example[index] ? .kept : .lost }
+        guard !probe.pending, let before = probe.before else { return .unchecked }
+        guard let after = probe.after else { return .lost }
         switch index {
-        case 0: return before.selection == after.selection
-        case 1: return before.scrollID == after.scrollID
-        case 2: return before.draft == after.draft
-        case 3: return before.focused == after.focused
-        case 4: return abs(before.progressStart.timeIntervalSince(after.progressStart)) < 0.5
-        default: return before.sheet == after.sheet
+        case 0: return before.selection == after.selection ? .kept : .lost
+        case 1: return before.scrollID == after.scrollID ? .kept : .lost
+        case 2: return before.draft == after.draft ? .kept : .lost
+        case 3:
+            if !before.focused { return after.focused ? .lost : .skipped("not typing") }
+            guard after.focused else { return .lost }
+            // Only a keyboard that is actually up counts as kept.
+            return probe.keyboardAfter ? .kept : .partial("focus kept, keyboard closed")
+        case 4: return abs(before.progressStart.timeIntervalSince(after.progressStart)) < 0.5 ? .kept : .lost
+        default: return before.sheet == after.sheet ? .kept : .lost
         }
     }
 
-    private func row(_ item: String, result: Bool?) -> some View {
+    @ViewBuilder
+    private func icon(_ outcome: Outcome) -> some View {
+        switch outcome {
+        case .unchecked, .skipped: Image(systemName: "circle.dotted").foregroundStyle(.secondary)
+        case .kept: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .lost: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .partial: Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+        }
+    }
+
+    private func row(_ item: String, outcome: Outcome) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: result == nil ? "circle.dotted" : result! ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(result == nil ? Color.secondary : result! ? Color.green : Color.red)
-            Text(item).font(.caption2)
-            Spacer(minLength: 0)
-            if result == false { Text("lost").font(.caption2.weight(.semibold)).foregroundStyle(.red) }
-            if item == "Sheet", !sheetTracked { Text("not open").font(.caption2).foregroundStyle(.secondary) }
+            icon(outcome)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(item).font(.caption2)
+                switch outcome {
+                case .lost: Text("lost").font(.caption2.weight(.semibold)).foregroundStyle(.red)
+                case .partial(let note): Text(note).font(.caption2.weight(.semibold)).foregroundStyle(.orange)
+                case .skipped(let note): Text(note).font(.caption2).foregroundStyle(.secondary)
+                default: EmptyView()
+                }
+            }
         }
     }
 }

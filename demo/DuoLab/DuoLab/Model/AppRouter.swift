@@ -32,6 +32,10 @@ final class AppRouter {
     /// The measuring overlay (safe area, fold, cameras, readout).
     var measure = false
     var banner: String?
+    /// The last hinge reading the app saw. `onHingeChange` only fires on a change, so a view
+    /// created later (stepping ‹ › re-creates the lab) seeds itself from this instead of
+    /// starting at "waiting". Kept current from the root, see `DuoChrome`.
+    var hinge = HingeReading.unknown
 
     private var bannerTask: Task<Void, Never>?
 

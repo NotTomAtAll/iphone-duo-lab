@@ -24,7 +24,7 @@ enum OverlaysLab {
 
     static let knobs: [KnobSpec] = [
         .toggle("avoid", "Bubble avoids reserved regions", default: true,
-                note: "Query reservedRegions(kind: .division / .occlusion) and push the bubble off the fold and cameras. System containers do this for you; custom overlays don't.",
+                note: "Ask where the fold and cameras are and push the bubble off them. System containers do this for you; custom overlays don't.",
                 facts: ["F-3a", "F-6b", "D11"]),
         KnobSpec("bubble", "Bubble size", options: [.init("small", "Small"), .init("large", "Large")], default: "small",
                  note: "A large bubble on the inner display is the case most likely to sit on the fold.",

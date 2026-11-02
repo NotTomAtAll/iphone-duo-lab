@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// What the system is handing the app right now. Read live, never cached (D10).
 struct EnvironmentSnapshot: Equatable {
@@ -54,6 +55,48 @@ struct HingeReading: Equatable {
         default: "other"
         }
         self.init(status: status, angle: hinge.angle.degrees)
+    }
+
+    init(_ update: UIHingeInteraction.Update) {
+        guard let hinge = update.hinge else {
+            self.init(status: "no hinge", angle: nil)
+            return
+        }
+        let status: String = switch hinge.status {
+        case .closed: "closed"
+        case .partiallyOpen: "partially open"
+        case .fullyOpen: "fully open"
+        default: "other"
+        }
+        self.init(status: status, angle: hinge.angle * 180 / .pi)
+    }
+}
+
+/// Hands the current hinge state to `action` as soon as it is in a window, then on every change.
+/// SwiftUI's `onHingeChange` reports changes only; UIKit's interaction also reports the initial
+/// state, which is what a reading needs at launch before anything has moved.
+struct HingeSeed: UIViewRepresentable {
+    var action: (HingeReading) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        let coordinator = context.coordinator
+        view.addInteraction(UIHingeInteraction { _, update in
+            // A nil hinge only means the view left the window; keep the last real reading.
+            guard update.hinge != nil else { return }
+            coordinator.action(HingeReading(update))
+        })
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) { context.coordinator.action = action }
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    final class Coordinator {
+        var action: (HingeReading) -> Void
+        init(action: @escaping (HingeReading) -> Void) { self.action = action }
     }
 }
 

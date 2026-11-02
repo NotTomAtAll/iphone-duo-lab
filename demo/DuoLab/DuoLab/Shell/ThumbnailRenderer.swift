@@ -40,8 +40,14 @@ final class ThumbnailRenderer {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         let stamp = (try? Bundle.main.executableURL?.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
             .map { String(Int($0.timeIntervalSince1970)) } ?? "0"
-        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appending(path: "thumbnails-\(build)-\(stamp)", directoryHint: .isDirectory)
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let name = "thumbnails-\(build)-\(stamp)"
+        let url = caches.appending(path: name, directoryHint: .isDirectory)
+        // Pictures from earlier builds are never read again: keep only the current folder.
+        let old = (try? FileManager.default.contentsOfDirectory(atPath: caches.path())) ?? []
+        for folder in old where folder.hasPrefix("thumbnails-") && folder != name {
+            try? FileManager.default.removeItem(at: caches.appending(path: folder, directoryHint: .isDirectory))
+        }
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
@@ -50,15 +56,21 @@ final class ThumbnailRenderer {
         "\(pose.rawValue)-\(scheme == .dark ? "dark" : "light")|" + KnobState(lab: lab, values: values).variantKey
     }
 
-    func request(lab: LabID, values: [String: String], pose: PreviewPose, scheme: ColorScheme) {
+    /// Queues a render. `urgent` puts it at the front of the line (a tapped card needs its
+    /// picture for the current display now), moving it there if it was already waiting.
+    func request(lab: LabID, values: [String: String], pose: PreviewPose, scheme: ColorScheme, urgent: Bool = false) {
         let key = Self.key(lab: lab, values: values, pose: pose, scheme: scheme)
-        guard images[key] == nil, !failed.contains(key), !inFlight.contains(key),
-              !queue.contains(where: { $0.key == key }) else { return }
+        guard images[key] == nil, !failed.contains(key), !inFlight.contains(key) else { return }
+        if let index = queue.firstIndex(where: { $0.key == key }) {
+            if urgent { queue.insert(queue.remove(at: index), at: 0) }
+            return
+        }
         if let cached = loadFromDisk(key) {
             images[key] = cached
             return
         }
-        queue.append(Job(key: key, lab: lab, values: values, pose: pose, scheme: scheme))
+        let job = Job(key: key, lab: lab, values: values, pose: pose, scheme: scheme)
+        if urgent { queue.insert(job, at: 0) } else { queue.append(job) }
         log.debug("queued \(key, privacy: .public) (\(self.queue.count) waiting)")
         startWorkers()
     }
@@ -124,7 +136,7 @@ final class ThumbnailRenderer {
         if current != wanted || sidebar { host.traitOverrides.horizontalSizeClass = wanted }
         if sidebar { host.traitOverrides.verticalSizeClass = .regular }
         window.overrideUserInterfaceStyle = job.scheme == .dark ? .dark : .light
-        window.frame = CGRect(origin: .zero, size: job.pose.canvas)
+        window.frame = Self.frame(for: job.pose, in: window)
         window.rootViewController = host
         window.isHidden = false
         window.layoutIfNeeded()
@@ -138,6 +150,19 @@ final class ThumbnailRenderer {
         }
         window.rootViewController = nil
         return image
+    }
+
+    /// The hidden window is pinned to the screen's bottom-trailing corner. UIKit places rail items
+    /// (the upright tab bar, toolbar buttons, back chevron) and the trailing safe area from the
+    /// SCENE's geometry, not the window's frame: a 951 pt window at x 0 on the 466 pt outer screen
+    /// got the outer display's rail at x ≈ 382–466, mid-picture. Aligning the window's trailing
+    /// edge with the screen's puts the screen's rail exactly on the window's own trailing 84 pt,
+    /// for either canvas on either display.
+    static func frame(for pose: PreviewPose, in window: UIWindow) -> CGRect {
+        let screen = window.windowScene?.coordinateSpace.bounds.size ?? pose.canvas
+        let canvas = pose.canvas
+        return CGRect(x: screen.width - canvas.width, y: screen.height - canvas.height,
+                      width: canvas.width, height: canvas.height)
     }
 
     private func window(_ slot: Int) -> UIWindow? {

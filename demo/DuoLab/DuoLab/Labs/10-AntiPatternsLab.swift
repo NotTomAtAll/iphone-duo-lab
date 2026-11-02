@@ -19,9 +19,9 @@ enum AntiPatternsLab {
                   lookFor: "Launch folded, open the device: Broken keeps the folded values.",
                   knobs: ["pattern": "cached"], highlight: "mode"),
         LabOption("orientation", "Layout by orientation", .avoid,
-                  summary: "Columns chosen from interface orientation.",
-                  pros: [], cons: ["The inner display ignores the orientation lock"],
-                  lookFor: "Broken picks columns from orientation; Fixed from size class.",
+                  summary: "Columns chosen from the phone's rotation.",
+                  pros: [], cons: ["The inner display ignores the rotation lock"],
+                  lookFor: "Broken picks columns from the rotation; Fixed from the width the screen actually has.",
                   knobs: ["pattern": "orientation"], highlight: "mode"),
         LabOption("clamp", "Clamp to a phone column", .avoid,
                   summary: "The whole app squeezed into 480 pt in the middle.",
@@ -32,7 +32,7 @@ enum AntiPatternsLab {
 
     static let knobs: [KnobSpec] = [
         KnobSpec("pattern", "Pattern", options: [
-            .init("screenMain", "UIScreen.main sizing"), .init("symmetric", "Symmetric insets"),
+            .init("screenMain", "Sized from the screen"), .init("symmetric", "Symmetric insets"),
             .init("cached", "Insets cached at launch"), .init("orientation", "Orientation-based layout"),
             .init("clamp", "Clamp app to a phone column"),
         ], note: "Each one works on a normal iPhone and fails on the Duo. Flip Broken/Fixed, then fold and unfold.",
@@ -105,7 +105,7 @@ private struct ScreenMainDemo: View {
             VStack(alignment: .leading, spacing: 16) {
                 Explainer(broken: broken,
                           wrong: "Banner width = screen width (\(Int(currentScreenWidth)) pt). The window isn't the screen.",
-                          right: "Banner width = container width (\(Int(proxy.size.width)) pt) from GeometryReader.")
+                          right: "Banner width = container width (\(Int(proxy.size.width)) pt), the space the view really has.")
                 Tile(index: 3)
                     .frame(width: width, height: 160)
                 Text("Container \(Int(proxy.size.width)) pt · screen \(Int(currentScreenWidth)) pt")
@@ -167,30 +167,35 @@ private struct CachedInsetsDemo: View {
     let broken: Bool
 
     var body: some View {
-        GeometryReader { proxy in
-            let live = proxy.safeAreaInsets
-            let cached = LaunchCache.insets.map {
-                EdgeInsets(top: $0.top, leading: $0.left, bottom: $0.bottom, trailing: $0.right)
-            } ?? EdgeInsets()
-            let used = broken ? cached : live
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                VStack(alignment: .leading, spacing: 12) {
-                    Explainer(broken: broken,
-                              wrong: "Uses the insets captured at launch. Fold or unfold and they go stale.",
-                              right: "Reads GeometryProxy.safeAreaInsets on every layout pass.")
-                    Text("launch \(cached.compact)\nlive   \(live.compact)")
-                        .font(.caption.monospaced())
-                    RoundedRectangle(cornerRadius: 10).fill(.purple.opacity(0.35))
-                        .overlay(Text("Content placed with \(broken ? "cached" : "live") insets").font(.headline))
+        VStack(alignment: .leading, spacing: 0) {
+            // The explanation gets its own row in the safe area, so stale insets below can't push it under the title.
+            Explainer(broken: broken,
+                      wrong: "Uses the insets captured at launch. Fold or unfold and they go stale.",
+                      right: "Reads the live safe area on every layout pass.")
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            GeometryReader { proxy in
+                let live = proxy.safeAreaInsets
+                let cached = LaunchCache.insets.map {
+                    EdgeInsets(top: $0.top, leading: $0.left, bottom: $0.bottom, trailing: $0.right)
+                } ?? EdgeInsets()
+                let used = broken ? cached : live
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("launch \(cached.compact)\nlive   \(live.compact)")
+                            .font(.caption.monospaced())
+                        RoundedRectangle(cornerRadius: 10).fill(.purple.opacity(0.35))
+                            .overlay(Text("Content placed with \(broken ? "cached" : "live") insets").font(.headline))
+                    }
+                    .padding(.top, used.top)
+                    .padding(.leading, used.leading)
+                    .padding(.trailing, used.trailing)
+                    .padding(.bottom, used.bottom)
+                    .padding(.horizontal, 8)
                 }
-                .padding(.top, used.top)
-                .padding(.leading, used.leading)
-                .padding(.trailing, used.trailing)
-                .padding(.bottom, used.bottom)
-                .padding(.horizontal, 8)
+                .ignoresSafeArea(edges: [.horizontal, .bottom])
             }
-            .ignoresSafeArea()
         }
     }
 }
@@ -205,8 +210,8 @@ private struct OrientationDemo: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Explainer(broken: broken,
-                              wrong: "Layout keyed off interfaceOrientation (\(isLandscape ? "landscape" : "portrait")). The inner display ignores the orientation lock.",
-                              right: "Layout keyed off horizontalSizeClass (\(sizeClass == .regular ? "regular" : "compact")).")
+                              wrong: "Columns picked from the phone's rotation (\(isLandscape ? "landscape" : "portrait")). The inner display ignores the rotation lock.",
+                              right: "Columns picked from the width class (\(sizeClass == .regular ? "wide" : "narrow")).")
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: wide ? 4 : 2), spacing: 12) {
                         ForEach(0..<16, id: \.self) { Tile(index: $0).aspectRatio(1, contentMode: .fit) }
                     }

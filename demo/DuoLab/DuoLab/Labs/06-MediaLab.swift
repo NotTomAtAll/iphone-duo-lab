@@ -14,10 +14,10 @@ enum MediaLab {
                   lookFor: "Compare fully open with book pose.",
                   knobs: ["arrangement": "overlay"]),
         LabOption("fixed-panel", "Fixed side panel", .consider,
-                  summary: "A chat column of fixed width beside the video.",
+                  summary: "A chat column of fixed width beside the video on the open display. Folded, the panel has to stack under the video instead.",
                   pros: ["Works on any OS version"],
-                  cons: ["Ignores the fold", "Squeezes the video on the outer display"],
-                  lookFor: "Fold: the video becomes a sliver.",
+                  cons: ["Ignores the fold: the split sits wherever the fixed width puts it", "Needs its own folded layout, or the panel squeezes the video"],
+                  lookFor: "Book pose: the edge of the chat column misses the fold. Fold: the panel moves under the video.",
                   knobs: ["arrangement": "hstack"]),
         LabOption("full-bleed", "Full-bleed video", .consider,
                   summary: "Video runs edge to edge, under the clock and cameras.",
@@ -35,9 +35,9 @@ enum MediaLab {
 
     static let knobs: [KnobSpec] = [
         KnobSpec("arrangement", "Arrangement", options: [
-            .init("split", "ArrangementView .split"), .init("overlay", "ArrangementView .overlay"),
-            .init("hstack", "Plain HStack"), .init("stack", "Video only + sheet"),
-        ], note: "ArrangementView splits along the fold when there is a division and stacks or overlays when there isn't. HStack is the same layout with no fold awareness.",
+            .init("split", "Split at the fold"), .init("overlay", "Panel over video"),
+            .init("hstack", "Fixed side panel"), .init("stack", "Video only + sheet"),
+        ], note: "The system arrangement splits along the fold when there is one, and stacks or overlays when there isn't. A fixed side panel is the same layout with no fold awareness.",
         facts: ["F-3b", "D11"]),
         KnobSpec("video", "Video safe area", options: [.init("respect", "Respect"), .init("ignore", "Ignore")],
                  note: "Full-bleed video under the rail and cameras looks good; controls on top of it must not follow it out of the safe area.",
@@ -51,6 +51,7 @@ enum MediaLab {
 struct MediaLabView: View {
     let state: KnobState
     @State private var showsPanelSheet = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         Group {
@@ -62,9 +63,17 @@ struct MediaLabView: View {
                 ArrangementView { video } secondary: { panel }
                     .arrangementViewStyle(.overlay)
             case "hstack":
-                HStack(spacing: 0) {
-                    video
-                    panel.frame(width: 320)
+                if sizeClass == .compact {
+                    // A fixed 320 pt column leaves the video a sliver on the outer display.
+                    VStack(spacing: 0) {
+                        video.aspectRatio(16 / 9, contentMode: .fit)
+                        panel
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        video
+                        panel.frame(width: 320)
+                    }
                 }
             default:
                 video
@@ -107,10 +116,14 @@ private struct VideoStandIn: View {
                 HStack {
                     Label("LIVE", systemImage: "dot.radiowaves.left.and.right")
                         .font(.caption.bold())
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(.red, in: .capsule)
-                    Spacer()
+                    Spacer(minLength: 8)
                     Text("1.2k watching").font(.caption)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 Spacer()
                 Image(systemName: "play.circle.fill").font(.system(size: 64))

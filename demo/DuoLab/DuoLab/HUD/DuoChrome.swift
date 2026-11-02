@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The HUD overlay: reserved regions drawn as tinted boxes, plus a small readout panel.
 struct HUDOverlay: View {
-    @State private var hinge = HingeReading.unknown
+    @Environment(AppRouter.self) private var router
+    private var hinge: HingeReading { router.hinge }
 
     var body: some View {
         EnvironmentProbe { snapshot in
@@ -25,7 +26,6 @@ struct HUDOverlay: View {
             }
         }
         .allowsHitTesting(false)
-        .onHingeChange { _, new in hinge = HingeReading(new) }
     }
 
     private func readout(_ s: EnvironmentSnapshot) -> some View {
@@ -165,6 +165,12 @@ struct DuoChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // The app's one long-lived hinge reader: everything else seeds from `router.hinge`.
+            .background { HingeSeed { if router.hinge != $0 { router.hinge = $0 } }.allowsHitTesting(false).accessibilityHidden(true) }
+            .onHingeChange { _, new in
+                let reading = HingeReading(new)
+                if router.hinge != reading { router.hinge = reading }
+            }
             .overlay {
                 if includesReach, showsReach { ReachOverlay() }
             }

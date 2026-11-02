@@ -63,7 +63,7 @@ enum ToolbarsLab {
 
     static let knobs: [KnobSpec] = [
         KnobSpec("bar", "Bar", options: [.init("system", "System"), .init("custom", "Custom")],
-                 note: "Apple: only system containers (NavigationStack + .toolbar) move to the side. A hand-built bar stays where you put it.",
+                 note: "Apple: only bars the system builds move to the side. A hand-built bar stays where you put it.",
                  facts: ["F-3c", "F-6a"]),
         KnobSpec("title", "Title", options: [.init("large", "Large"), .init("inline", "Inline")],
                  note: "On a vertical bar the title stays in the content area. Compare how much vertical space each mode costs.",
@@ -75,7 +75,7 @@ enum ToolbarsLab {
                  note: "Count the items that fit before overflow on the short outer display. The second item carries a badge.",
                  facts: ["F-2c"]),
         .toggle("bottomBar", "Bottom toolbar",
-                note: "Items in .bottomBar move to the side on the outer display as well.",
+                note: "Bottom-bar items move to the side on the outer display as well.",
                 facts: ["F-6a"]),
         .toggle("tabs", "In a tab view",
                 note: "Puts the screen inside a four-tab tab view, so tabs and actions compete for the same side column.",

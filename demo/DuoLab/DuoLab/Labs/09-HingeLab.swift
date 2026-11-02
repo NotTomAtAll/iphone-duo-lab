@@ -50,7 +50,7 @@ enum HingeLab {
                  note: "Apple: use the hinge for effects, not layout. Layout comes from size classes and reserved regions.",
                  facts: ["F-3d", "D11"]),
         KnobSpec("source", "Angle source", options: [.init("hinge", "Hinge"), .init("slider", "Slider")],
-                 note: "The simulator only changes pose by hand in Device Hub (Option-drag for any angle). The slider fakes the angle for quick checks.",
+                 note: "The simulator changes pose by hand through its fold control (Option-drag for any angle). The slider fakes the angle for quick checks.",
                  facts: ["F-5a", "F-5b"]),
         KnobSpec("layout", "Screen", options: [.init("none", "Effect alone"), .init("space", "Columns from space"), .init("angle", "Columns from angle")],
                  note: "Puts the effect on a screen with a list. Columns should come from the width the screen has, never from the angle.",
@@ -88,6 +88,8 @@ struct HingeLabView: View {
     @State private var sliderAngle: Double = 120
     @State private var ticks = 0
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Optional: thumbnails render this view in a hidden window without the router.
+    @Environment(AppRouter.self) private var router: AppRouter?
 
     /// Quantised to 1° so sensor noise doesn't redraw the effect for nothing.
     private var angle: Double {
@@ -111,6 +113,9 @@ struct HingeLabView: View {
             }
         }
         .foregroundStyle(state["layout"] == "none" ? Color.white : Color.primary)
+        // ‹ › re-creates this view and onHingeChange only reports changes: start from the last
+        // reading the app saw, not from "waiting".
+        .onAppear { if let last = router?.hinge, last != .unknown { reading = last } }
         .onHingeChange { _, new in
             // No withAnimation: the effect tracks the hand directly.
             reading = HingeReading(new)
@@ -164,7 +169,7 @@ struct HingeLabView: View {
             Slider(value: $sliderAngle, in: 0...180) { Text("Angle") }
                 .frame(maxWidth: 420)
         } else if reading.angle == nil {
-            LookFor(text: "No angle yet. Change pose in Device Hub, or switch the source to Slider.")
+            LookFor(text: "No angle yet. Use the simulator’s fold control, or switch the source to Slider.")
         }
     }
 

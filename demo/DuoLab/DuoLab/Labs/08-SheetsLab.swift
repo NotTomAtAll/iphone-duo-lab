@@ -67,7 +67,7 @@ enum SheetsLab {
         facts: []),
         KnobSpec("sizing", "Sheet sizing", options: [
             .init("automatic", "Automatic"), .init("form", "Form"), .init("page", "Page"), .init("fitted", "Fitted"),
-        ], note: "presentationSizing picks the card size in regular width. Form is narrower; page is wider. In book pose every size is kept in one half.",
+        ], note: "Picks the card size on the inner display. Form is narrower; page is wider. In book pose every size is kept in one half.",
         facts: ["F-2b"]),
         KnobSpec("placement", "Sheet placement", options: [
             .init("automatic", "Automatic"), .init("leading", "Leading"), .init("center", "Center"), .init("trailing", "Trailing"),

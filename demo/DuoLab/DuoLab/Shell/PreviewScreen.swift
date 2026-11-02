@@ -13,6 +13,8 @@ struct PreviewScreen: View {
     /// False while arriving or leaving: the zoom shows the card's picture, the fade shows nothing.
     @State private var settled: Bool
     @State private var closing = false
+    /// A fade's way out is always a whole-screen fade, even when it arrived on a picture.
+    @State private var leaving = false
     @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
@@ -40,17 +42,21 @@ struct PreviewScreen: View {
     }
 
     var body: some View {
-        let fades = entrance == .fade
+        // The picture of this option on this display, when the card (or the tap) had one ready.
+        // Zoom always has it; a fade has it when the tap pre-rendered it in time.
+        let picture = entrance == .system ? nil : cardImage
+        // Without a picture, a fade brings the whole screen in from nothing.
+        let fades = entrance == .fade && (picture == nil || leaving)
         // Every arrival/leave animation is scoped to opacity and scale only: an unscoped
         // withAnimation here would also animate the live view's first layout (tiles grow in).
         let speed = Animation.easeOut(duration: entrance == .zoom ? 0.2 : 0.24)
         ZStack {
             LabContent(lab: lab, state: state)
                 .id(index)
-            // Zoom: the first and last frames are the card's own picture, so the morph is seamless;
-            // the live view (whose bars lay out a beat later) cross-fades in underneath.
-            if entrance == .zoom, let image = cardImage {
-                Image(uiImage: image)
+            // The first frame is the picture, so there is no frame of the live view laid out at the
+            // wrong width; the live view (whose bars lay out a beat later) cross-fades in underneath.
+            if let picture, !leaving || entrance == .zoom {
+                Image(uiImage: picture)
                     .resizable()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -69,19 +75,20 @@ struct PreviewScreen: View {
         .overlay {
             // `-duolab.hideBar 1` hides the lab controls for clean captures.
             if !UserDefaults.standard.bool(forKey: "duolab.hideBar") {
-            FloatingBar {
-                OptionBarContent(lab: lab, option: option, index: index, state: state,
-                                 onClose: close, onStep: step, onInfo: { showsInfo = true })
-            }
-            .animation(speed) { $0.opacity(settled ? 1 : 0) }
+                FloatingBar {
+                    OptionBarContent(lab: lab, option: option, index: index, state: state,
+                                     onClose: close, onStep: step, onInfo: { showsInfo = true })
+                }
+                .animation(speed) { $0.opacity(settled ? 1 : 0) }
             }
         }
         .sheet(isPresented: $showsInfo) { OptionInfoSheet(lab: lab, option: option, state: state) }
         .duoChrome(includesReach: false)
         .task {
             guard !settled else { return }
-            // Zoom: let the morph finish on the picture. Fade: wait one layout pass.
-            try? await Task.sleep(for: .milliseconds(entrance == .zoom ? 380 : 30))
+            // With a picture, let the live view lay out under it before cross-fading.
+            // A fade without one waits a single layout pass.
+            try? await Task.sleep(for: .milliseconds(cardImage != nil ? 380 : 30))
             settled = true
         }
     }
@@ -113,6 +120,7 @@ struct PreviewScreen: View {
                 dismiss()
             }
         case .fade:
+            leaving = true
             settled = false
             Task {
                 try? await Task.sleep(for: .milliseconds(240))
@@ -125,16 +133,30 @@ struct PreviewScreen: View {
 }
 
 /// Floats its content over the screen. Drag it and it snaps to the nearest of six spots
-/// (top or bottom; leading, center or trailing), remembered across launches.
+/// (top or bottom; leading, center or trailing), remembered per display across launches.
+/// Default spots sit at the top, where demos rarely put their controls: top-trailing (just left
+/// of the rail) on the outer display, top-leading on the inner one. While the keyboard is up a
+/// bottom spot moves to the top of the same column, so the bar never sits on or near the keys.
 struct FloatingBar<Content: View>: View {
     @ViewBuilder let content: Content
-    @AppStorage("duolab.barSpot") private var spot = 3
+    @AppStorage("duolab.barSpot.compact") private var compactSpot = 2
+    @AppStorage("duolab.barSpot.regular") private var regularSpot = 2
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var drag: CGSize = .zero
     @State private var size: CGSize = .zero
+    @State private var keyboardUp = false
+
+    private var spot: Int {
+        get { sizeClass == .regular ? regularSpot : compactSpot }
+        nonmutating set { if sizeClass == .regular { regularSpot = newValue } else { compactSpot = newValue } }
+    }
+
+    /// The spot actually used: a bottom spot lifts to the top while the keyboard is up.
+    private var shown: Int { keyboardUp ? spot % 3 : spot }
 
     var body: some View {
         GeometryReader { proxy in
-            let base = point(spot, in: proxy.size)
+            let base = point(shown, in: proxy.size)
             content
                 .fixedSize()
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
@@ -154,7 +176,12 @@ struct FloatingBar<Content: View>: View {
                         }
                 )
                 .sensoryFeedback(.impact(weight: .light), trigger: spot)
+                .animation(.snappy, value: shown)
         }
+        // The keyboard is handled above (top row), so its safe area must not push the bar around.
+        .ignoresSafeArea(.keyboard)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
     }
 
     /// Spots 0–2 along the top, 3–5 along the bottom; leading, center, trailing.
@@ -169,7 +196,8 @@ struct FloatingBar<Content: View>: View {
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 }
 
-/// Close · ‹ option › · info, in one glass capsule.
+/// Close · ‹ option › · info, in one glass capsule. After a few seconds without a touch it folds
+/// into a small chip (verdict, "n/N", chevron) so the demo underneath is visible; tap to expand.
 struct OptionBarContent: View {
     let lab: LabID
     let option: LabOption
@@ -178,43 +206,146 @@ struct OptionBarContent: View {
     var onClose: () -> Void
     var onStep: (Int) -> Void
     var onInfo: () -> Void
+    /// Seconds without a touch before the bar folds into its chip.
+    static var idleDelay: Duration { .seconds(3) }
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var collapsed = false
+    /// Bumped by every touch on the bar; restarts the idle timer.
+    @State private var activity = 0
 
     var body: some View {
+        Group {
+            if collapsed {
+                chip.transition(.scale(scale: 0.6).combined(with: .opacity))
+            } else {
+                expanded.transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: collapsed)
+        .task(id: activity) {
+            try? await Task.sleep(for: Self.idleDelay)
+            guard !Task.isCancelled else { return }
+            collapsed = true
+        }
+    }
+
+    private func touched() {
+        collapsed = false
+        activity += 1
+    }
+
+    private var chip: some View {
+        Button {
+            touched()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: option.verdict.symbol).foregroundStyle(option.verdict.color)
+                Text("\(index + 1)/\(lab.options.count)").monospacedDigit()
+                Image(systemName: "chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+        .accessibilityLabel("\(option.title), \(option.verdict.title), \(index + 1) of \(lab.options.count)")
+        .accessibilityHint("Shows the lab controls")
+    }
+
+    private var expanded: some View {
         VStack(spacing: 8) {
             if let id = option.highlight, let spec = state.spec(id) {
-                Picker(spec.title, selection: Binding(get: { state[id] }, set: { state[id] = $0 })) {
-                    ForEach(spec.options, id: \.value) { Text($0.label).tag($0.value) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 220)
-                .padding(5)
-                .glassEffect(.regular, in: .capsule)
+                HighlightPicker(spec: spec, state: state, maxWidth: sizeClass == .regular ? 460 : 300,
+                                onChange: touched)
             }
             HStack(spacing: 2) {
-                Button("Close", systemImage: "xmark", action: onClose)
-                    .frame(width: 40, height: 44)
-                Button("Previous", systemImage: "chevron.left") { onStep(-1) }
-                    .frame(width: 34, height: 44)
+                barButton("Close", "xmark", width: 40, action: onClose)
+                barButton("Previous", "chevron.left", width: 34) { touched(); onStep(-1) }
                 VStack(spacing: 1) {
                     Text(option.title)
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(sizeClass == .regular ? 2 : 1)
+                        .minimumScaleFactor(0.85)
+                        .multilineTextAlignment(.center)
                     Text("\(option.verdict.title) · \(index + 1) of \(lab.options.count)")
                         .font(.caption2)
                         .foregroundStyle(option.verdict.color)
                 }
                 .frame(maxWidth: sizeClass == .regular ? 340 : 200)
-                Button("Next", systemImage: "chevron.right") { onStep(1) }
-                    .frame(width: 34, height: 44)
-                Button("About this option", systemImage: "info.circle", action: onInfo)
-                    .frame(width: 40, height: 44)
+                .fixedSize(horizontal: false, vertical: true)
+                barButton("Next", "chevron.right", width: 34) { touched(); onStep(1) }
+                barButton("About this option", "info.circle", width: 40) { touched(); onInfo() }
             }
-            .labelStyle(.iconOnly)
             .font(.body.weight(.semibold))
             .padding(.horizontal, 6)
             .glassEffect(.regular.interactive(), in: .capsule)
             .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
+        }
+    }
+
+    /// The whole 44 pt cell is the hit target, not just the glyph.
+    private func barButton(_ title: String, _ symbol: String, width: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .frame(width: width, height: 44)
+                .contentShape(.rect)
+        }
+        .accessibilityLabel(title)
+    }
+}
+
+/// The option's highlighted knob. Segmented when its choices fit; otherwise a menu that shows the
+/// current value (more than three choices, or labels too long to read in a segment).
+private struct HighlightPicker: View {
+    let spec: KnobSpec
+    let state: KnobState
+    let maxWidth: CGFloat
+    var onChange: () -> Void
+
+    private var selection: Binding<String> {
+        Binding(get: { state[spec.id] }, set: { state[spec.id] = $0; onChange() })
+    }
+
+    /// Segment widths measured with the segmented control's font plus its padding per segment.
+    private var segmentsFit: Bool {
+        guard spec.options.count <= 3 else { return false }
+        let font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        let widest = spec.options.map { ($0.label as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return (widest + 28) * CGFloat(spec.options.count) <= maxWidth
+    }
+
+    var body: some View {
+        if segmentsFit {
+            Picker(spec.title, selection: selection) {
+                ForEach(spec.options, id: \.value) { Text($0.label).tag($0.value) }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .padding(5)
+            .glassEffect(.regular, in: .capsule)
+        } else {
+            Menu {
+                Picker(spec.title, selection: selection) {
+                    ForEach(spec.options, id: \.value) { Text($0.label).tag($0.value) }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(spec.title + ":").foregroundStyle(.secondary)
+                    Text(spec.options.first { $0.value == state[spec.id] }?.label ?? state[spec.id])
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.bold))
+                }
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: maxWidth)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
+                .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
 }
@@ -267,15 +398,25 @@ struct OptionInfoSheet: View {
                     Text("How it’s built")
                 }
             }
-            .navigationTitle(lab.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", systemImage: "checkmark") { dismiss() }
+            // Our own opaque header under the grabber: at the large detent the list would otherwise
+            // scroll under the grabber, and the system bar put Done in the rail with no title.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(alignment: .center) {
+                    Text(lab.title).font(.headline)
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .buttonStyle(.glassProminent)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 22)
+                .padding(.bottom, 10)
+                .background(Color(.systemGroupedBackground))
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Color(.systemGroupedBackground))
     }
 }

@@ -36,11 +36,11 @@ enum TabBarLab {
     static let knobs: [KnobSpec] = [
         KnobSpec("placement", "Default placement", options: [
             .init("automatic", "Automatic"), .init("tabBar", "Tab bar"), .init("sidebar", "Sidebar"),
-        ], note: "Apple: the bottom bar is the default on both Duo displays; a sidebar on the inner display is opt-in. Watch the bar go vertical on the outer display and in inner landscape.",
+        ], note: "Apple: the tab bar is the default on both displays; a sidebar on the inner display is opt-in. On iPhone Duo the bar stands upright beside the content in every pose.",
         facts: ["T-6", "T-31", "F-6a", "D12"]),
-        KnobSpec("style", "TabView style", options: [
+        KnobSpec("style", "Tab style", options: [
             .init("automatic", "Automatic"), .init("sidebarAdaptable", "Sidebar adaptable"), .init("tabBarOnly", "Tab bar only"),
-        ], note: "defaultTabBarPlacement only acts when the style is sidebarAdaptable. Tab bar only disables the sidebar everywhere.",
+        ], note: "The sidebar choice only works when the tab view is allowed to become a sidebar. Tab bar only turns the sidebar off everywhere.",
         facts: ["T-4", "T-6"]),
         KnobSpec("minimize", "Minimize on scroll", options: [
             .init("automatic", "Automatic"), .init("never", "Never"), .init("onScrollDown", "On scroll down"), .init("onScrollUp", "On scroll up"),
@@ -50,13 +50,13 @@ enum TabBarLab {
                 note: "A mini-player style bar above the tab bar, shared by all tabs. Not draggable; not a PIP replacement.",
                 facts: ["T-8", "D8"]),
         .toggle("badges", "Badges", default: true,
-                note: "Tab.badge takes numbers or text. See where badges sit when the bar is vertical.",
+                note: "A badge takes a number or short text. See where badges sit when the bar is vertical.",
                 facts: ["T-10"]),
         .toggle("roles", "Search + prominent roles", default: true,
                 note: "The search tab moves to the trailing end; a prominent tab sits apart (iOS 27).",
                 facts: ["T-2", "T-3"]),
         .toggle("hideOnPush", "Hide bar on pushed screen",
-                note: "toolbarVisibility(.hidden, for: .tabBar) on the pushed view. Swipe back and watch for glitches.",
+                note: "The pushed screen hides the tab bar. Swipe back and watch for glitches.",
                 facts: ["T-17", "T-18", "D7"]),
     ]
 }
@@ -87,7 +87,8 @@ struct TabBarLabView: View {
         styled(
             TabView(selection: selectionProxy) {
                 Tab("Feed", systemImage: "rectangle.stack.fill", value: DemoTab.feed) {
-                    FeedTab(path: $feedPath, reselects: reselects, hideOnPush: state.isOn("hideOnPush"))
+                    FeedTab(path: $feedPath, reselects: reselects, hideOnPush: state.isOn("hideOnPush"),
+                            minimizeHint: state["minimize"] == "onScrollDown")
                 }
                 .badge(state.isOn("badges") ? 3 : 0)
                 Tab("Library", systemImage: "books.vertical.fill", value: DemoTab.library) {
@@ -155,11 +156,18 @@ private struct FeedTab: View {
     @Binding var path: [Int]
     let reselects: Int
     let hideOnPush: Bool
+    /// Minimize looks like the native bar until you scroll, so say what to try right in the feed.
+    var minimizeHint = false
 
     var body: some View {
         NavigationStack(path: $path) {
             ScrollViewReader { reader in
                 List {
+                    if minimizeHint {
+                        Label("Scroll down. On iPhone Duo the bar stays as it is.", systemImage: "arrow.down")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(0..<40, id: \.self) { index in
                         NavigationLink(value: index) {
                             HStack(spacing: 12) {

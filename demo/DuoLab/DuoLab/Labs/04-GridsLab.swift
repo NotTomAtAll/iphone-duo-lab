@@ -3,16 +3,16 @@ import SwiftUI
 enum GridsLab {
     static let options: [LabOption] = [
         LabOption("adaptive-even", "Adaptive grid, even columns", .recommended,
-                  summary: "As many columns as fit, always an even number, so a gap, not a photo, sits on the fold.",
+                  summary: "As many columns as fit, in an even number. In book pose the grid splits at the fold, so a gap, not a photo, sits on it.",
                   pros: ["Reflows on every display with no breakpoints", "A gutter, not a tile, lands on the fold"],
-                  cons: ["Sometimes one column fewer than would fit"],
-                  lookFor: "Open the device: 4 columns, with the fold between the 2nd and 3rd.",
+                  cons: ["Sometimes one column fewer than would fit", "Needs to know where the fold is, not just the width"],
+                  lookFor: "Book pose: 4 columns, with the fold in the gap between the 2nd and 3rd.",
                   knobs: ["layout": "adaptive160", "evenFold": "on"]),
         LabOption("adaptive-large", "Large adaptive tiles", .consider,
                   summary: "Fewer, bigger tiles with room for captions.",
                   pros: ["Room for captions and metadata"],
-                  cons: ["Only 2 columns folded and open"],
-                  lookFor: "Compare tile size between the two displays.",
+                  cons: ["1 column folded, only 2 on the inner display"],
+                  lookFor: "Compare tile size between the two displays. In book pose there is one column each side of the fold.",
                   knobs: ["layout": "adaptive220", "evenFold": "on"]),
         LabOption("carousel-rows", "Carousel rows", .consider,
                   summary: "Rows you swipe sideways, softly faded at the edges.",
@@ -43,10 +43,10 @@ enum GridsLab {
         note: "Fixed counts stretch tiles on the inner display. Adaptive reflows by container width, with no breakpoints (Apple: avoid fixed widths).",
         facts: ["F-4a", "D1"]),
         .toggle("evenFold", "Even columns",
-                note: "HIG: prefer an even column count so a gutter, not a tile, lands on the fold.",
+                note: "HIG: prefer an even column count so a gutter, not a tile, lands on the fold. When a fold is reported, the grid splits into one grid each side of it.",
                 facts: ["F-6b"]),
         KnobSpec("edge", "Carousel edge", options: [.init("clip", "Clip"), .init("fade", "Fade"), .init("margin", "Content margin")],
-                 note: "Carousels are the first thing clipped by a side rail. Fade or contentMargins keeps the peek honest.",
+                 note: "Carousels are the first thing clipped by a side rail. A fade or a content margin keeps the peek honest.",
                  facts: ["M-1", "R-§1"]),
         KnobSpec("rows", "Carousel rows", options: [.init("1", "1"), .init("2", "2"), .init("3", "3")],
                  note: "On the inner display one carousel row leaves most of the screen empty.",
@@ -73,23 +73,78 @@ struct GridsLabView: View {
 
 private struct GridDemo: View {
     let state: KnobState
+    private let spacing: CGFloat = 12
+    private let margin: CGFloat = 16
+    private let count = 60
 
     var body: some View {
-        GeometryReader { proxy in
+        RegionReader { size, folds, _ in
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    LazyVGrid(columns: columns(for: proxy.size.width), spacing: 12) {
-                        ForEach(0..<60, id: \.self) { Tile(index: $0).aspectRatio(1, contentMode: .fit) }
-                    }
+                if let fold = splitFold(folds, size: size) {
+                    split(size: size, fold: fold)
+                } else {
+                    grid(indices: Array(0..<count), columns: columnCount(for: size.width - 2 * margin, evenFold: state.isOn("evenFold")))
+                        .padding(margin)
                 }
-                .padding()
             }
         }
     }
 
-    private func columns(for width: CGFloat) -> [GridItem] {
-        let spacing: CGFloat = 12
-        let usable = max(width - 32, 1)
+    /// With "Even columns" on and a vertical fold reported, the fold becomes the middle gutter.
+    private func splitFold(_ folds: [CGRect], size: CGSize) -> CGRect? {
+        guard state.isOn("evenFold"),
+              let fold = folds.first(where: { $0.height > $0.width }),
+              fold.minX > margin * 2, fold.maxX < size.width - margin * 2 else { return nil }
+        return fold
+    }
+
+    /// Two grids, one each side of the fold. The narrower side (the rail takes room on the trailing
+    /// one) sets the column count and tile size for both, so rows line up and the layout is
+    /// symmetric around the fold.
+    private func split(size: CGSize, fold: CGRect) -> some View {
+        let half = spacing / 2
+        let leftWidth = fold.minX - margin - half
+        let rightWidth = size.width - fold.maxX - margin - half
+        let narrow = min(leftWidth, rightWidth)
+        let side = sideColumns(narrow)
+        let tile = max((narrow - CGFloat(side - 1) * spacing) / CGFloat(side), 1)
+        // Reading order runs across both sides, row by row.
+        let perRow = side * 2
+        let rows = (count + perRow - 1) / perRow
+        let leftIndices = (0..<rows).flatMap { row in (0..<side).map { row * perRow + $0 } }.filter { $0 < count }
+        let rightIndices = (0..<rows).flatMap { row in (0..<side).map { row * perRow + side + $0 } }.filter { $0 < count }
+        let item = GridItem(.fixed(tile), spacing: spacing)
+        return HStack(alignment: .top, spacing: 0) {
+            grid(indices: leftIndices, item: item, columns: side)
+                .frame(width: leftWidth, alignment: .trailing)
+                .padding(.leading, margin)
+                .padding(.trailing, half)
+            Color.clear.frame(width: fold.width)
+            grid(indices: rightIndices, item: item, columns: side)
+                .frame(width: rightWidth, alignment: .leading)
+                .padding(.leading, half)
+                .padding(.trailing, margin)
+        }
+        .padding(.vertical, margin)
+    }
+
+    private func grid(indices: [Int], item: GridItem? = nil, columns: Int) -> some View {
+        LazyVGrid(columns: Array(repeating: item ?? GridItem(.flexible(), spacing: spacing), count: columns), spacing: spacing) {
+            ForEach(indices, id: \.self) { Tile(index: $0).aspectRatio(1, contentMode: .fit) }
+        }
+    }
+
+    /// Columns for one side of the fold: fixed layouts split their count, adaptive ones fit their width.
+    private func sideColumns(_ width: CGFloat) -> Int {
+        switch state["layout"] {
+        case "fixed2": 1
+        case "fixed3": 2
+        default: columnCount(for: width, evenFold: false)
+        }
+    }
+
+    private func columnCount(for usableWidth: CGFloat, evenFold: Bool) -> Int {
+        let usable = max(usableWidth, 1)
         var count: Int
         switch state["layout"] {
         case "fixed2": count = 2
@@ -97,8 +152,8 @@ private struct GridDemo: View {
         case "adaptive220": count = max(1, Int((usable + spacing) / (220 + spacing)))
         default: count = max(1, Int((usable + spacing) / (160 + spacing)))
         }
-        if state.isOn("evenFold"), count > 1, count % 2 == 1 { count -= 1 }
-        return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+        if evenFold, count > 1, count % 2 == 1 { count -= 1 }
+        return count
     }
 }
 
