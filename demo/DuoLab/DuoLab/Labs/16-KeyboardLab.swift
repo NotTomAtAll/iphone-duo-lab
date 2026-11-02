@@ -6,7 +6,7 @@ enum KeyboardLab {
         LabOption("composer-above-keyboard", "Field rides on the keyboard", .recommended,
                   summary: "The message field sits at the bottom and moves up with the keyboard; the messages scroll so the newest stays in view.",
                   pros: ["The field is never hidden, whatever size the keyboard is", "No keyboard height to guess", "The newest message stays just above the field"],
-                  cons: ["One pane: on the open display it stretches across the fold"],
+                  cons: ["One pane: on the flat open display it runs across the middle; in book pose it keeps to one side of the fold"],
                   lookFor: "Closed: tap the field. It lifts with the keyboard and the readout says Clear. Then open the device: the keyboard should stay up.",
                   highlight: "composer"),
         LabOption("composer-in-pane", "Field in the message pane", .recommended,
@@ -222,16 +222,38 @@ private struct KeyboardDemo: View {
 
     // MARK: Layouts
 
-    @ViewBuilder
+    /// One pane. Book pose: the conversation keeps to the half before the fold and the readout
+    /// moves to the other half. The conversation stays in the same place in the hierarchy either
+    /// way, so the field keeps focus when the pose changes.
     private var onePane: some View {
+        RegionReader { size, folds, _ in
+            let fold = folds.first { $0.height > $0.width && $0.minX > 200 }
+            HStack(spacing: 0) {
+                singleColumn(readoutStrip: fold == nil)
+                    .frame(width: fold?.minX ?? size.width)
+                if let fold {
+                    FoldGutter(reported: true).frame(width: fold.width)
+                    VStack(alignment: .leading) {
+                        if readout { readoutCard(strip: false) }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func singleColumn(readoutStrip: Bool) -> some View {
         switch composer {
         case "fixed":
-            conversation
+            conversation(readoutStrip: readoutStrip)
                 .safeAreaPadding(.bottom, 64)
                 .overlay(alignment: .bottom) { field }
                 .ignoresSafeArea(.keyboard)
         default:
-            conversation
+            conversation(readoutStrip: readoutStrip)
                 .safeAreaInset(edge: .bottom, spacing: 0) { field }
         }
     }
@@ -259,7 +281,14 @@ private struct KeyboardDemo: View {
         }
     }
 
-    private var conversation: some View {
+    private var conversation: some View { conversation(readoutStrip: true) }
+
+    private func readoutCard(strip: Bool) -> some View {
+        ReadoutCard(readings: readings, thumbnail: isThumbnail, composer: composer, standIn: standInHeight, strip: strip)
+    }
+
+    /// The messages. The readout, when shown here, is a one-line strip above them, never on them.
+    private func conversation(readoutStrip: Bool) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -278,8 +307,8 @@ private struct KeyboardDemo: View {
                 proxy.scrollTo(messages.last?.id, anchor: .bottom)
             }
         }
-        .overlay(alignment: .topLeading) {
-            if readout { ReadoutCard(readings: readings, thumbnail: isThumbnail, composer: composer, standIn: standInHeight).padding(10) }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if readout && readoutStrip { readoutCard(strip: true) }
         }
     }
 
@@ -389,8 +418,42 @@ private struct ReadoutCard: View {
     let thumbnail: Bool
     let composer: String
     let standIn: CGFloat
+    /// One line under the top edge of the conversation instead of a card.
+    var strip = false
 
     var body: some View {
+        if strip { line } else { card }
+    }
+
+    private var line: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "keyboard").accessibilityHidden(true)
+            Group {
+                if thumbnail {
+                    Text("Height \(Int(standIn)) (example)")
+                } else {
+                    Text("Guide \(Int(readings.guide.rounded())) · Safe area \(Int(readings.safeBottom.rounded()))"
+                         + (readings.guideUndocked ? " · undocked" : ""))
+                }
+            }
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            Spacer(minLength: 6)
+            status(covered: thumbnail ? (composer == "fixed" ? 52 : 0) : readings.fieldCovered)
+                .lineLimit(1)
+        }
+        .font(.caption2.monospacedDigit())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("keyboard.readout")
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 3) {
             Label("Keyboard", systemImage: "keyboard").font(.caption.weight(.semibold))
             if thumbnail {
@@ -426,9 +489,9 @@ private struct ReadoutCard: View {
     @ViewBuilder
     private func status(covered: CGFloat) -> some View {
         if covered > 0 {
-            Label("Field covered by \(Int(covered)) pt", systemImage: "xmark.circle.fill").foregroundStyle(.red)
+            Label(strip ? "Covered \(Int(covered)) pt" : "Field covered by \(Int(covered)) pt", systemImage: "xmark.circle.fill").foregroundStyle(.red)
         } else {
-            Label("Field clear of keyboard", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label(strip ? "Field clear" : "Field clear of keyboard", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         }
     }
 }

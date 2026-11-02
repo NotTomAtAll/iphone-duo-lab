@@ -16,7 +16,7 @@ struct TopicsView: View {
         Group {
             if sizeClass == .regular { split } else { stack }
         }
-        .fullScreenCover(item: Bindable(router).preview) { target in
+        .fullScreenCover(item: coverTarget) { target in
             // Keyed on the target: a link that swaps the option without a transition (see
             // `AppRouter.handle`) keeps the cover up, and must still get a fresh screen.
             switch target.entrance {
@@ -26,10 +26,17 @@ struct TopicsView: View {
             case .fade:
                 PreviewScreen(target: target).id(target)
                     .presentationBackground(.clear)
-            case .system:
+            case .system, .linked:
                 PreviewScreen(target: target).id(target)
             }
         }
+    }
+
+    /// The option shown in the cover. A linked option is drawn by the root view instead (see
+    /// `PreviewEntrance.linked`), and the cover going away for it must not clear it.
+    private var coverTarget: Binding<PreviewTarget?> {
+        Binding(get: { router.preview?.entrance.usesCover == true ? router.preview : nil },
+                set: { if $0 != nil || router.preview?.entrance.usesCover == true { router.preview = $0 } })
     }
 
     private var stack: some View {

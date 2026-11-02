@@ -105,22 +105,27 @@ struct SheetsLabView: View {
                     try? await Task.sleep(for: .milliseconds(600))
                     present(1)
                 }
-            VStack(spacing: 28) {
-                VStack(spacing: 8) {
-                    Text(kindTitle).font(.largeTitle.bold())
-                    Text(kindExplainer)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 520)
+            RegionReader { _, folds, _ in
+                // Book pose: the title and its button sit in the half before the fold.
+                let lead = folds.first { $0.height > $0.width }.map { max($0.minX - 16, 200) }
+                VStack(spacing: 28) {
+                    VStack(spacing: 8) {
+                        Text(kindTitle).font(.largeTitle.bold())
+                        Text(kindExplainer)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 520)
+                    }
+                    if !isAnchored {
+                        Button("Show \(kindTitle.lowercased())", systemImage: "rectangle.portrait.on.rectangle.portrait") { present(1) }
+                            .buttonStyle(.glass)
+                            .controlSize(.large)
+                    }
                 }
-                if !isAnchored {
-                    Button("Show \(kindTitle.lowercased())", systemImage: "rectangle.portrait.on.rectangle.portrait") { present(1) }
-                        .buttonStyle(.glass)
-                        .controlSize(.large)
-                }
+                .frame(maxWidth: lead ?? .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottom) {
                 // Popovers and menus point at their button, so open them from each edge:
                 // beside the leading edge, on the fold, and next to the trailing rail.

@@ -177,3 +177,8 @@ Confidence: **likely**.
 - `onHingeChange` at launch and the angle's smoothness on a physical hinge.
 - Haptics at pose boundaries.
 - Animation smoothness during a real fold (lab 13); the simulator jumps between poses.
+
+## Added after round 5
+
+- **A full-screen cover presented before the scene is active blocks every touch until the presentation finishes** (about 0.6–0.85 s after the first frame, measured with `-duolab.timeline 1`). An option opened from a link is now drawn in the root view instead; the first tap lands within 0.4–0.7 s of the first frame. Measured.
+- **In book pose, any single-column list or text column spans the fold unless you split it yourself.** Every Recommended answer now splits at the fold's edges (`FoldColumns`, `FoldLocator`). Measured.

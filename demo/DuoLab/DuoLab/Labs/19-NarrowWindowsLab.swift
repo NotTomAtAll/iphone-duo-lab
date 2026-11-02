@@ -84,11 +84,11 @@ struct NarrowWindowsLabView: View {
     @Environment(\.horizontalSizeClass) private var realSizeClass
 
     var body: some View {
-        GeometryReader { proxy in
+        RegionReader { size, folds, _ in
             let layout = state["layout"]
             // An app that wasn't rebuilt gets the compatibility box whatever the system offers.
             let value = layout == "compatUnrebuilt" ? "compat" : state["window"]
-            let window = SimulatedWindow.make(value, real: proxy.size)
+            let window = SimulatedWindow.make(value, real: size)
             if window.isReal {
                 ZStack(alignment: .top) {
                     AppScreen(layout: layout, window: window.size, screen: window.screen)
@@ -97,7 +97,13 @@ struct NarrowWindowsLabView: View {
                         .padding(.top, 6)
                 }
             } else {
-                stage(window, layout: layout, available: proxy.size)
+                // Book pose: a split window lives on one side of the fold, so draw it in the leading half.
+                let fold = folds.first { $0.height > $0.width && $0.minX > 200 }
+                let side = value == "splitHalf" || value == "splitThird" ? fold.map(\.minX) : nil
+                stage(window, layout: layout, available: CGSize(width: side ?? size.width, height: size.height))
+                    .frame(width: side)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(white: 0.32))
             }
         }
         .background(Color(.systemBackground))

@@ -237,29 +237,38 @@ private struct HingeScreen<Header: View, Controls: View>: View {
     let angle: Double
     @ViewBuilder let header: Header
     @ViewBuilder let controls: Controls
+    /// Space kept clear on each side of the fold.
+    private var foldGap: CGFloat { 12 }
 
     var body: some View {
         RegionReader { size, folds, _ in
             let proxy = (size: size, fold: folds.first { $0.height > $0.width })
             let columns = layoutFromAngle ? (angle >= 90 ? 2 : 1) : (proxy.size.width >= 700 ? 2 : 1)
+            // Book pose: the header, slider and caption keep to the half before the fold.
+            let lead: CGFloat? = columns == 2 ? proxy.fold.map { max($0.minX - 16 - foldGap, 200) } : nil
             ScrollView {
                 VStack(spacing: 16) {
-                    header
-                        .frame(maxWidth: .infinity)
-                        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
-                    VStack(spacing: 8) { controls }
-                    Text(layoutFromAngle
-                         ? "\(columns) column\(columns == 1 ? "" : "s"), because the angle is \(angle >= 90 ? "at least" : "under") 90\u{00B0}"
-                         : "\(columns) column\(columns == 1 ? "" : "s"), from the \(Int(proxy.size.width)) pt the screen has")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(layoutFromAngle ? .red : .green)
+                    VStack(spacing: 16) {
+                        header
+                            .frame(maxWidth: .infinity)
+                            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+                        VStack(spacing: 8) { controls }
+                        Text(layoutFromAngle
+                             ? "\(columns) column\(columns == 1 ? "" : "s"), because the angle is \(angle >= 90 ? "at least" : "under") 90\u{00B0}"
+                             : "\(columns) column\(columns == 1 ? "" : "s"), from the \(Int(proxy.size.width)) pt the screen has")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(layoutFromAngle ? .red : .green)
+                    }
+                    .frame(maxWidth: lead ?? .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     if columns == 2, let fold = proxy.fold {
-                        // Two columns with the gap on the fold, so no row straddles it.
+                        // Two columns with a gap around the fold, so no row straddles it.
                         HStack(alignment: .top, spacing: 0) {
                             VStack(spacing: 12) { ForEach(Array(stride(from: 0, to: 12, by: 2)), id: \.self) { row($0) } }
-                                .frame(width: max(fold.minX - 16, 120))
-                            Spacer(minLength: fold.width)
+                                .frame(width: max(fold.minX - 16 - foldGap, 120))
+                            Color.clear.frame(width: fold.width + 2 * foldGap)
                             VStack(spacing: 12) { ForEach(Array(stride(from: 1, to: 12, by: 2)), id: \.self) { row($0) } }
+                                .frame(maxWidth: .infinity)
                         }
                     } else {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {

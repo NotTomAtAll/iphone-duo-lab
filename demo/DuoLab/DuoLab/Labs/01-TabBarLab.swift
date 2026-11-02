@@ -162,21 +162,22 @@ private struct FeedTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollViewReader { reader in
-                List {
-                    if minimizeHint {
-                        Label("Scroll down. On iPhone Duo the bar stays as it is.", systemImage: "arrow.down")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
+                FoldColumns(count: 40) {
+                    hint.padding(.horizontal, 16)
+                } row: { index in
+                    NavigationLink(value: index) {
+                        HStack {
+                            row(index)
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        }
+                        .contentShape(.rect)
                     }
-                    ForEach(0..<40, id: \.self) { index in
-                        NavigationLink(value: index) {
-                            HStack(spacing: 12) {
-                                Tile(index: index, showsCaption: false).frame(width: 52, height: 52)
-                                VStack(alignment: .leading) {
-                                    Text(Placeholder.name(index)).font(.headline)
-                                    Text(Placeholder.sentence).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                }
-                            }
+                    .buttonStyle(.plain)
+                } fallback: {
+                    List {
+                        hint
+                        ForEach(0..<40, id: \.self) { index in
+                            NavigationLink(value: index) { row(index) }
                         }
                     }
                 }
@@ -196,6 +197,26 @@ private struct FeedTab: View {
                 .navigationTitle(Placeholder.name(index))
                 .toolbarVisibility(hideOnPush ? .hidden : .automatic, for: .tabBar)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var hint: some View {
+        if minimizeHint {
+            Label("Scroll down. On iPhone Duo the bar stays as it is.", systemImage: "arrow.down")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func row(_ index: Int) -> some View {
+        HStack(spacing: 12) {
+            Tile(index: index, showsCaption: false).frame(width: 52, height: 52)
+            VStack(alignment: .leading) {
+                Text(Placeholder.name(index)).font(.headline)
+                Text(Placeholder.sentence).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 0)
         }
     }
 }

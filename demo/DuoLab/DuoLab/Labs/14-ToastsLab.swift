@@ -3,7 +3,7 @@ import SwiftUI
 enum ToastsLab {
     static let options: [LabOption] = [
         LabOption("inline", "Show the change itself", .recommended,
-                  summary: "No message box: the row changes (a filled bookmark, an Archived tag) and a quiet status line under the pane says what happened.",
+                  summary: "No message box: the row changes (a filled bookmark, an Archived tag) and a quiet status line under the buttons says what happened.",
                   pros: ["Nothing covers the content", "Works the same on both displays and in every pose", "The proof stays on screen"],
                   cons: ["Only works when the change is visible somewhere"],
                   lookFor: "Tap Save, Archive and Copy link: the row and the status line change; nothing floats.",
@@ -98,7 +98,6 @@ struct ToastsLabView: View {
         } detail: {
             detail
                 .overlay { pill(for: .detail) }
-                .safeAreaInset(edge: .bottom) { statusLine(for: .detail) }
         }
         .safeAreaInset(edge: .top, spacing: 0) { banner }
         .overlay { windowWide }
@@ -162,6 +161,8 @@ struct ToastsLabView: View {
                         .overlay { Image(systemName: Placeholder.symbol(item.id)).font(.system(size: 54)).foregroundStyle(.white) }
                     Text(item.title).font(.largeTitle.bold())
                     actions(for: item)
+                    // Its own row under the buttons, so it never covers them on a short window.
+                    statusRow
                     Text(Placeholder.paragraphs[0])
                     HStack {
                         TextField("Add a note", text: $note)
@@ -249,6 +250,21 @@ struct ToastsLabView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(.bar)
+                .accessibilityAddTraits(.updatesFrequently)
+        }
+    }
+
+    /// Inline, detail pane: the status sits in the content, right under the action buttons.
+    @ViewBuilder
+    private var statusRow: some View {
+        if style == "inline", (toast?.pane ?? .detail) == .detail {
+            Label(status, systemImage: "checkmark.circle")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.fill.quaternary, in: .rect(cornerRadius: 10))
                 .accessibilityAddTraits(.updatesFrequently)
         }
     }

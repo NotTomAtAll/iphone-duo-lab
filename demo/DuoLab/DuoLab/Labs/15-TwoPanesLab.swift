@@ -116,6 +116,58 @@ struct FoldGutter: View {
     }
 }
 
+/// Book pose: a plain list's rows in two columns, one each side of the fold, so no row runs
+/// through it. Otherwise (folded, or open flat) the screen's own list.
+struct FoldColumns<Header: View, Row: View, Fallback: View>: View {
+    let count: Int
+    @ViewBuilder let header: Header
+    @ViewBuilder let row: (Int) -> Row
+    @ViewBuilder let fallback: Fallback
+    /// Space kept clear on each side of the fold.
+    private var gap: CGFloat { 12 }
+
+    var body: some View {
+        RegionReader { size, folds, _ in
+            if let fold = folds.first(where: { $0.height > $0.width }),
+               fold.minX > 240, size.width - fold.maxX > 240 {
+                ScrollView {
+                    HStack(alignment: .top, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            header
+                            column(Array(stride(from: 0, to: count, by: 2)))
+                        }
+                        .frame(width: fold.minX - 16 - gap)
+                        Color.clear.frame(width: fold.width + 2 * gap)
+                        column(Array(stride(from: 1, to: count, by: 2)))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .background(Color(.systemGroupedBackground))
+            } else {
+                fallback
+            }
+        }
+    }
+
+    private func column(_ indices: [Int]) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(indices, id: \.self) { index in
+                row(index)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .bottom) {
+                        if index != indices.last { Divider().padding(.leading, 16) }
+                    }
+                    .id(index)
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+    }
+}
+
 // MARK: - Model
 
 private struct Shelf {

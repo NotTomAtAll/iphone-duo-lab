@@ -29,7 +29,7 @@ struct PreviewScreen: View {
         let state = KnobState(lab: target.lab, values: target.lab.options[index].knobs)
         state.apply(target.knobs)
         _state = State(initialValue: state)
-        _settled = State(initialValue: target.entrance == .system)
+        _settled = State(initialValue: target.entrance == .system || target.entrance == .linked)
     }
 
     private var option: LabOption { lab.options[index] }
@@ -44,7 +44,7 @@ struct PreviewScreen: View {
     var body: some View {
         // The picture of this option on this display, when the card (or the tap) had one ready.
         // Zoom always has it; a fade has it when the tap pre-rendered it in time.
-        let picture = entrance == .system ? nil : cardImage
+        let picture = entrance == .system || entrance == .linked ? nil : cardImage
         // Without a picture, a fade brings the whole screen in from nothing.
         let fades = entrance == .fade && (picture == nil || leaving)
         // Every arrival/leave animation is scoped to opacity and scale only: an unscoped
@@ -53,6 +53,7 @@ struct PreviewScreen: View {
         ZStack {
             LabContent(lab: lab, state: state)
                 .id(index)
+                .launchTimelineTaps("preview content")
             // The first frame is the picture, so there is no frame of the live view laid out at the
             // wrong width; the live view (whose bars lay out a beat later) cross-fades in underneath.
             if let picture, !leaving || entrance == .zoom {
@@ -75,21 +76,25 @@ struct PreviewScreen: View {
         .overlay {
             // `-duolab.hideBar 1` hides the lab controls for clean captures.
             if !UserDefaults.standard.bool(forKey: "duolab.hideBar") {
-                FloatingBar(compactTop: lab.barCompactTop) { touched in
+                FloatingBar(compactTop: lab.barCompactTop, paused: showsInfo) { touched in
                     OptionBarContent(lab: lab, option: option, index: index, state: state, onTouch: touched,
-                                     onClose: close, onStep: step, onInfo: { showsInfo = true })
+                                     onClose: close, onStep: step, onInfo: { LaunchTimeline.mark("info tapped"); showsInfo = true })
                 } handle: {
-                    BarHandle(lab: lab, option: option, index: index)
+                    BarHandle(lab: lab, option: option, index: index, adjusted: state.differs(from: option))
                 }
                 .animation(speed) { $0.opacity(settled ? 1 : 0) }
             }
         }
         .sheet(isPresented: $showsInfo) { OptionInfoSheet(lab: lab, option: option, state: state) }
         .duoChrome(includesReach: false)
+        .onAppear { LaunchTimeline.mark("preview appear \(lab.rawValue)") }
         .task {
+            LaunchTimeline.mark("preview task")
             // Hold the background thumbnail work while this screen arrives: each render shows a
-            // hidden window and forces a screen update, which slows the arrival down.
-            ThumbnailRenderer.shared.hold(for: .seconds(1))
+            // hidden window and forces a screen update, which slows the arrival down. Opened by a
+            // link, the pictures are for the topic page underneath, which nobody sees yet: let the
+            // first seconds belong to the screen someone is about to touch.
+            ThumbnailRenderer.shared.hold(for: entrance == .linked ? .seconds(4) : .seconds(1))
             guard !settled else { return }
             // With a picture, let the live view lay out under it before cross-fading.
             // A fade without one waits a single layout pass.
@@ -113,6 +118,9 @@ struct PreviewScreen: View {
         switch entrance {
         case .system:
             dismiss()
+        case .linked:
+            // Drawn in the root: fade out to the topic page underneath.
+            withAnimation(.easeOut(duration: 0.2)) { router.preview = nil }
         case .zoom:
             // Only swap to the card's picture when it shows what is on screen: same option, knobs
             // untouched. Otherwise the live view zooms back into the card the user came from.
@@ -139,8 +147,10 @@ struct PreviewScreen: View {
 
 /// Floats the lab controls over the screen. Expanded, they sit at one of six spots (top or
 /// bottom; leading, center or trailing); drag them and they snap to the nearest, remembered per
-/// display across launches. After a few seconds without a touch they fold into a slim handle on
-/// the trailing content edge, vertically centred, where demos put no controls; tap it to expand.
+/// display across launches. They fold into a slim handle on the trailing content edge, vertically
+/// centred, where demos put no controls; tap it to expand. Folding is patient (see `collapseDelay`):
+/// never before the person has touched the demo itself, never in the first 10 s, and only after
+/// 8 s without any touch.
 ///
 /// Default spot is top-trailing (just left of the rail). On the outer display the top row sits a
 /// title-line lower, under a large navigation title instead of on it. While the keyboard is up a
@@ -149,10 +159,15 @@ struct FloatingBar<Content: View, Handle: View>: View {
     /// How far below the top the top row starts on the outer display.
     var compactTop: CGFloat = 50
     /// The expanded controls. Call the closure on every touch: it restarts the idle timer.
+    /// True while something covers the screen (the info sheet): the bar stays open, and touches
+    /// there don't count as using the demo. When it turns false the bar opens for another idle span.
+    var paused = false
     @ViewBuilder let content: (_ touched: @escaping () -> Void) -> Content
     @ViewBuilder let handle: Handle
-    /// Seconds without a touch before the bar folds into its handle.
-    static var idleDelay: Duration { .seconds(3) }
+    /// Time without a touch (anywhere) before the bar folds into its handle.
+    static var idleDelay: Duration { .seconds(8) }
+    /// The bar never folds this soon after the screen appears.
+    static var settleTime: Duration { .seconds(10) }
     @AppStorage("duolab.barSpot.compact") private var compactSpot = 2
     @AppStorage("duolab.barSpot.regular") private var regularSpot = 2
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -160,8 +175,14 @@ struct FloatingBar<Content: View, Handle: View>: View {
     @State private var size: CGSize = .zero
     @State private var keyboardUp = false
     @State private var collapsed = false
-    /// Bumped by every touch on the bar; restarts the idle timer.
+    /// Bumped by every touch, on the bar or the demo; restarts the idle timer.
     @State private var activity = 0
+    /// Whether the person has touched the demo itself (outside the bar) yet. Until then the bar
+    /// stays open: they have not shown they know where it is or what it is for.
+    @State private var usedDemo = false
+    @State private var appeared = ContinuousClock.now
+    /// The bar's (or handle's) frame in global coordinates, to tell its touches from the demo's.
+    @State private var barFrame: CGRect = .zero
 
     private var spot: Int {
         get { sizeClass == .regular ? regularSpot : compactSpot }
@@ -177,6 +198,7 @@ struct FloatingBar<Content: View, Handle: View>: View {
                 if collapsed {
                     Button(action: touched) { handle }
                         .buttonStyle(.plain)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { barFrame = $0 }
                         .position(x: proxy.size.width - BarHandle.hitSize.width / 2 - 1,
                                   y: proxy.size.height / 2)
                         .transition(.scale(scale: 0.5, anchor: .trailing).combined(with: .opacity))
@@ -185,6 +207,7 @@ struct FloatingBar<Content: View, Handle: View>: View {
                     content(touched)
                         .fixedSize()
                         .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { barFrame = $0 }
                         .position(x: base.x + drag.width, y: base.y + drag.height)
                         .gesture(
                             DragGesture(minimumDistance: 6)
@@ -213,14 +236,30 @@ struct FloatingBar<Content: View, Handle: View>: View {
         .ignoresSafeArea(.keyboard)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
+        .background { WindowTouchObserver(onTouch: demoTouched).allowsHitTesting(false) }
+        .onChange(of: paused) { _, now in if !now { touched() } }
         .task(id: activity) {
-            try? await Task.sleep(for: Self.idleDelay)
-            guard !Task.isCancelled else { return }
+            guard usedDemo, !paused else { return }
+            try? await Task.sleep(for: collapseDelay)
+            guard !Task.isCancelled, !paused else { return }
             collapsed = true
         }
     }
 
+    /// The idle span, stretched so the bar never folds inside the first `settleTime`.
+    private var collapseDelay: Duration {
+        max(Self.idleDelay, Self.settleTime - (ContinuousClock.now - appeared))
+    }
+
+    /// Any touch in the window. Touches on the bar are counted by its own controls.
+    private func demoTouched(_ point: CGPoint) {
+        guard !paused, !barFrame.insetBy(dx: -4, dy: -4).contains(point) else { return }
+        usedDemo = true
+        activity += 1
+    }
+
     private func touched() {
+        LaunchTimeline.mark("bar touched")
         collapsed = false
         activity += 1
     }
@@ -250,22 +289,25 @@ extension LabID {
     }
 }
 
-/// The folded bar: a slim glass tab on the trailing edge with the verdict dot and a grabber.
+/// The folded bar: a slim glass tab on the trailing edge with the verdict dot over a settings
+/// glyph, so it reads as "the controls" rather than a scroll indicator.
 /// 22 × 64 pt to look at; the tap target is 44 pt wide.
 struct BarHandle: View {
     let lab: LabID
     let option: LabOption
     let index: Int
+    var adjusted = false
     static let hitSize = CGSize(width: 44, height: 64)
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 9) {
             Circle()
                 .fill(option.verdict.color)
                 .frame(width: 8, height: 8)
-            Capsule()
-                .fill(.secondary)
-                .frame(width: 3, height: 22)
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 18, height: 16)
         }
         .frame(width: 22, height: 64)
         .glassEffect(.regular.interactive(), in: .capsule)
@@ -273,7 +315,7 @@ struct BarHandle: View {
         .frame(width: Self.hitSize.width, height: Self.hitSize.height, alignment: .trailing)
         .contentShape(.rect)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(option.title), \(option.verdict.title), \(index + 1) of \(lab.options.count)")
+        .accessibilityLabel("\(option.title), \(adjusted ? "Adjusted" : option.verdict.title), \(index + 1) of \(lab.options.count)")
         .accessibilityHint("Shows the lab controls")
         .accessibilityAddTraits(.isButton)
     }
@@ -315,9 +357,11 @@ struct OptionBarContent: View {
                             .minimumScaleFactor(0.9)
                     }
                     .multilineTextAlignment(.center)
-                    Text("\(option.verdict.title) · \(index + 1) of \(lab.options.count)")
+                    // Once a setting no longer matches the answer, the verdict is not about what is shown.
+                    let adjusted = state.differs(from: option)
+                    Text("\(adjusted ? "Adjusted" : option.verdict.title) · \(index + 1) of \(lab.options.count)")
                         .font(.caption2)
-                        .foregroundStyle(option.verdict.color)
+                        .foregroundStyle(adjusted ? Color.secondary : option.verdict.color)
                 }
                 .frame(maxWidth: titleWidth)
                 .fixedSize(horizontal: false, vertical: true)
@@ -416,9 +460,21 @@ struct OptionInfoSheet: View {
                         Text(option.summary).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
+                    NavigationLink {
+                        FineTuneView(state: state, option: option)
+                    } label: {
+                        Label("Adjust this answer", systemImage: "slider.horizontal.3")
+                    }
+                    if state.differs(from: option) {
+                        Button("Reset to the answer", systemImage: "arrow.counterclockwise") {
+                            state.restore(option)
+                        }
+                    }
                 }
                 Section("Try this") {
                     Text(option.lookFor)
+                    Label("Fold or unfold the phone to see this on the other display.", systemImage: "iphone.gen3")
+                        .foregroundStyle(.secondary)
                 }
                 if !option.pros.isEmpty {
                     Section("Good") {
@@ -437,7 +493,6 @@ struct OptionInfoSheet: View {
                     if let note = option.buildNote(in: lab) {
                         Text(note).font(.footnote.monospaced()).foregroundStyle(.secondary)
                     }
-                    NavigationLink("Adjust settings") { FineTuneView(state: state, option: option) }
                     Toggle("Show measurements", isOn: $router.measure)
                 } header: {
                     Text("How it’s built")
@@ -486,13 +541,13 @@ struct FineTuneView: View {
         Form {
             KnobSections(state: state)
             Section {
-                Button("Reset to “\(option.title)”", systemImage: "arrow.counterclockwise") {
-                    state.reset()
-                    state.apply(option.knobs)
+                Button("Reset to the answer", systemImage: "arrow.counterclockwise") {
+                    state.restore(option)
                 }
+                .disabled(!state.differs(from: option))
             }
         }
-        .navigationTitle("Fine-tune")
+        .navigationTitle("Adjust this answer")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -542,5 +597,66 @@ struct LabContent: View {
         case .camera: CameraLabView(state: state)
         case .narrowWindows: NarrowWindowsLabView(state: state)
         }
+    }
+}
+
+/// Reports every touch that starts anywhere in this view's window (window coordinates, which are
+/// the global SwiftUI coordinates for a full-screen view), without taking part in any gesture:
+/// the demo's own buttons, lists and scroll views behave exactly as without it.
+private struct WindowTouchObserver: UIViewRepresentable {
+    var onTouch: (CGPoint) -> Void
+
+    func makeUIView(context: Context) -> Anchor { Anchor(onTouch: onTouch) }
+    func updateUIView(_ view: Anchor, context: Context) { view.observer.onTouch = onTouch }
+    static func dismantleUIView(_ view: Anchor, coordinator: ()) { view.observer.view?.removeGestureRecognizer(view.observer) }
+
+    final class Anchor: UIView {
+        let observer: Observer
+        init(onTouch: @escaping (CGPoint) -> Void) {
+            observer = Observer(onTouch: onTouch)
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            observer.view?.removeGestureRecognizer(observer)
+            window?.addGestureRecognizer(observer)
+        }
+    }
+
+    final class Observer: UIGestureRecognizer {
+        var onTouch: (CGPoint) -> Void
+        init(onTouch: @escaping (CGPoint) -> Void) {
+            self.onTouch = onTouch
+            super.init(target: nil, action: nil)
+            cancelsTouchesInView = false
+            delaysTouchesBegan = false
+            delaysTouchesEnded = false
+        }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            if let touch = touches.first, let window = view as? UIWindow {
+                onTouch(touch.location(in: window))
+            }
+            state = .failed
+        }
+
+        override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+        override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+    }
+}
+
+extension KnobState {
+    /// True when any knob no longer has the value the option sets (a link's knob overrides count).
+    func differs(from option: LabOption) -> Bool {
+        variantKey != KnobState(lab: lab, values: option.knobs).variantKey
+    }
+
+    /// Back to exactly the option's preset.
+    func restore(_ option: LabOption) {
+        reset()
+        apply(option.knobs)
     }
 }

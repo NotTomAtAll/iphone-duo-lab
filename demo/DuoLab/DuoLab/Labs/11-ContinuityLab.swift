@@ -300,7 +300,10 @@ private struct NotesLayout: View {
 
     private var regular: some View {
         RegionReader { size, folds, _ in
-            let listWidth = folds.first?.minX ?? min(380, size.width * 0.4)
+            // Book pose: the list ends at the fold's leading edge and the note starts past its
+            // trailing edge, so nothing sits in the curve.
+            let fold = folds.first { $0.height > $0.width }
+            let listWidth = fold?.minX ?? min(380, size.width * 0.4)
             HStack(spacing: 0) {
                 NavigationStack {
                     NotesList(notes: $notes)
@@ -314,7 +317,11 @@ private struct NotesLayout: View {
                         }
                 }
                 .frame(width: listWidth)
-                Divider()
+                if let fold {
+                    FoldGutter(reported: true).frame(width: fold.width)
+                } else {
+                    Divider()
+                }
                 NavigationStack {
                     if let selection = notes.selection {
                         NoteDetail(index: selection, notes: $notes)

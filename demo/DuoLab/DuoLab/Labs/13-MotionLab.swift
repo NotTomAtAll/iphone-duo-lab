@@ -76,7 +76,7 @@ private struct MotionDemo: View {
 
     var body: some View {
         RegionReader { size, folds, _ in
-            let geometry = Geometry(size: size, fold: folds.first, layout: layout)
+            let geometry = Geometry(size: size, fold: folds.first { $0.height > $0.width }, layout: layout)
             animated(stage(geometry), size: size)
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
@@ -141,6 +141,10 @@ private struct MotionDemo: View {
             list
                 .frame(width: split ? geometry.listWidth : nil)
                 .frame(maxHeight: split ? .infinity : geometry.size.height * 0.34)
+            // Book pose: the detail starts past the fold's trailing edge.
+            if split, let fold = geometry.fold {
+                FoldGutter(reported: true).frame(width: fold.width)
+            }
             detail(columns: geometry.columns)
         }
     }
@@ -226,7 +230,7 @@ private struct Geometry {
 
     /// Even column counts, so a gap rather than a tile meets the fold.
     var columns: Int {
-        let width = layout == .split ? size.width - listWidth : size.width
+        let width = layout == .split ? size.width - listWidth - (fold?.width ?? 0) : size.width
         let count = max(2, Int((width - 32 + 10) / (110 + 10)))
         return count % 2 == 0 ? count : count - 1
     }

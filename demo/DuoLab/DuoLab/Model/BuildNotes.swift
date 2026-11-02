@@ -61,7 +61,7 @@ extension LabOption {
         "laptop/same": "One VStack (video, control row, list) in every pose; no reserved-region checks.",
         "laptop/laptop-only": "A wide .division region switches to a video + list layout with no transport controls.",
         "laptop/controls-top": "Overlay arrangement with .overlayArrangementEdge(VerticalEdge.top); simulated laptop draws controls above the fold.",
-        "toasts/inline": "No overlay: row state changes and a status line in .safeAreaInset(edge: .bottom) of the source pane.",
+        "toasts/inline": "No overlay: the row changes; the list pane shows a status line in .safeAreaInset(edge: .bottom), the detail pane a status row under its buttons.",
         "toasts/pill": ".overlay on the source pane; GeometryReader frame plus reservedRegions(kind: .division) picks the side or region; AccessibilityNotification.Announcement; auto-dismiss via .task(id:).",
         "toasts/banner": ".safeAreaInset(edge: .top) on the NavigationSplitView, so content moves down.",
         "toasts/centered": "GeometryReader with .ignoresSafeArea(edges: .horizontal); pill centred on the window width.",

@@ -282,14 +282,22 @@ private struct DemoList: View {
     let header: AnyView?
 
     var body: some View {
-        List {
-            if let header { header }
-            ForEach(0..<30, id: \.self) { index in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(Placeholder.name(index)).font(.headline)
-                    Text(Placeholder.sentence).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-                }
+        FoldColumns(count: 30) {
+            if let header { header.padding(.horizontal, 16) }
+        } row: { index in
+            row(index)
+        } fallback: {
+            List {
+                if let header { header }
+                ForEach(0..<30, id: \.self) { row($0) }
             }
+        }
+    }
+
+    private func row(_ index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Placeholder.name(index)).font(.headline)
+            Text(Placeholder.sentence).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
         }
     }
 }

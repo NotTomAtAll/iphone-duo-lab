@@ -20,8 +20,16 @@ enum PreviewEntrance: Hashable {
     /// A quick fade and settle, when the card shows the other display (a wide picture cannot
     /// morph into a tall screen without looking wrong).
     case fade
-    /// The default cover slide, for deep links that have no card to come from.
+    /// The default cover slide.
     case system
+    /// Opened by a link or launch arguments: drawn straight in the root view, with no cover.
+    /// A cover presented during launch (before the scene is active) keeps UIKit dropping every
+    /// touch until its presentation completes, which left the whole screen dead for ~1 s after the
+    /// first frame. Without a presentation the screen takes touches from its first frame.
+    case linked
+
+    /// Whether this arrival is presented in a full-screen cover (everything but `.linked`).
+    var usesCover: Bool { self != .linked }
 }
 
 /// App-wide navigation.
@@ -56,7 +64,11 @@ final class AppRouter {
         }
         launch.step = max(1, launch.step)
         afterTour = nil
-        if preview != nil {
+        if preview?.entrance == .linked {
+            // Drawn in the root, not a cover: nothing to wait for.
+            preview = nil
+            tour = launch
+        } else if preview != nil {
             // One cover at a time: let the option screen go first.
             preview = nil
             Task { [weak self] in
@@ -94,6 +106,7 @@ final class AppRouter {
     }
 
     func handle(_ link: DeepLink) {
+        LaunchTimeline.mark("router.handle")
         var problems = link.errors
         if let measure = link.measure { self.measure = measure }
         if let tab = link.tab { self.tab = tab }
@@ -110,7 +123,9 @@ final class AppRouter {
                     if let option = lab.option(optionID) {
                         let preset = KnobState(lab: lab, values: option.knobs)
                         problems += preset.apply(link.knobs)
-                        preview = PreviewTarget(lab: lab, optionID: option.id, knobs: link.knobs)
+                        preview = PreviewTarget(lab: lab, optionID: option.id, knobs: link.knobs, entrance: .linked)
+                        // The option is drawn under any cover; a tour cover would hide it.
+                        if link.tour == nil, tour != nil { closeTour() }
                     } else {
                         problems.append("\(lab.title) has no option “\(optionID)”")
                     }

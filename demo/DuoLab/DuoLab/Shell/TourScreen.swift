@@ -10,16 +10,27 @@ struct TourScreen: View {
     @AppStorage("duolab.tourSeen") private var tourSeen = false
     /// The caption's height, so the live view starts below it instead of under it.
     @State private var captionHeight: CGFloat = 0
+    /// The keyboard's top edge in window points while it is up (a step's lab can raise it).
+    @State private var keyboardTop: CGFloat?
+    /// Folded, the step during which the keyboard came up: compare turns into a single pane for
+    /// the rest of that step (two stacked frames have no room left above the keys, and switching
+    /// back would raise the keyboard again from the new frame).
+    @State private var keyboardStep: String?
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     init(launch: TourLaunch) {
         _model = State(initialValue: TourModel(launch: launch))
     }
 
-    /// Compare shows two answers only when the topic has one to avoid.
-    private var comparing: Bool { model.compare && model.step.avoid != nil }
+    /// Compare shows two answers only when the topic has one to avoid, and folded only while the
+    /// keyboard stays down.
+    private var comparing: Bool { model.compare && model.step.avoid != nil && !compareHeldByKeyboard }
+
+    private var compareHeldByKeyboard: Bool { sizeClass != .regular && keyboardStep == model.step.id }
 
     var body: some View {
         let step = model.step
+        let keyboardLift = keyboardOverlap
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
             if !comparing {
@@ -27,7 +38,7 @@ struct TourScreen: View {
                 // Added in UIKit, so the lab's own bars and lists see it too.
                 InsetHost(content: TourLive(lab: step.lab, option: step.option).environment(router),
                           extra: UIEdgeInsets(top: captionHeight + 20, left: 0,
-                                              bottom: UserDefaults.standard.bool(forKey: "duolab.hideBar") ? 0 : 64,
+                                              bottom: (UserDefaults.standard.bool(forKey: "duolab.hideBar") ? 0 : 64) + keyboardLift,
                                               right: 0))
                     .ignoresSafeArea()
                     .id("single-\(step.id)")
@@ -35,9 +46,18 @@ struct TourScreen: View {
             }
             EnvironmentProbe { snapshot in
                 TourOverlay(model: model, layout: TourLayout(snapshot), comparing: comparing,
+                            keyboardTop: keyboardTop, compareHeld: model.compare && compareHeldByKeyboard,
                             reduceMotion: reduceMotion, onStep: go, onClose: { router.closeTour() },
                             onOpen: open, onCaptionHeight: { captionHeight = $0 })
             }
+            .ignoresSafeArea(.keyboard)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            keyboardChanged(frame)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.snappy) { keyboardTop = nil }
         }
         .gesture(TouchWatcher { model.touched() })
         .duoChrome()
@@ -48,6 +68,26 @@ struct TourScreen: View {
                 guard !Task.isCancelled else { return }
                 if model.tick(0.1, reduceMotion: reduceMotion) { go(1) }
             }
+        }
+    }
+
+    /// How far the keyboard reaches up from the window's bottom edge (0 while it is down).
+    private var keyboardOverlap: CGFloat {
+        guard let keyboardTop, let window = keyWindowHeight else { return 0 }
+        return max(0, window - keyboardTop)
+    }
+
+    private var keyWindowHeight: CGFloat? {
+        UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.keyWindow?.bounds.height
+    }
+
+    private func keyboardChanged(_ screenFrame: CGRect) {
+        // Keyboard frames are in screen coordinates; the app's window fills its screen.
+        let height = keyWindowHeight ?? screenFrame.maxY
+        let up = screenFrame.height > 0 && screenFrame.minY < height - 1
+        withAnimation(.snappy) {
+            keyboardTop = up ? screenFrame.minY : nil
+            if up, sizeClass != .regular { keyboardStep = model.step.id }
         }
     }
 
@@ -100,6 +140,10 @@ private struct TourOverlay: View {
     let model: TourModel
     let layout: TourLayout
     let comparing: Bool
+    /// The keyboard's top edge in window points, while it is up: the strip sits above it.
+    var keyboardTop: CGFloat?
+    /// Compare is on, but shows a single pane because the keyboard is up (folded).
+    var compareHeld = false
     let reduceMotion: Bool
     var onStep: (Int) -> Void
     var onClose: () -> Void
@@ -134,7 +178,7 @@ private struct TourOverlay: View {
                 .transition(.opacity)
             } else {
                 let pane = layout.leading
-                TourCaption(step: step, option: step.option, compareNote: model.compare)
+                TourCaption(step: step, option: step.option, compareNote: model.compare, keyboardNote: compareHeld)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: min(pane.width - 2 * margin, 460))
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onCaptionHeight($0) }
@@ -144,9 +188,11 @@ private struct TourOverlay: View {
             }
             if !hidesStrip {
                 let pane = layout.leading
+                // Above the keyboard when it covers the pane's bottom edge.
+                let lift = keyboardTop.map { max(0, pane.maxY - $0) } ?? 0
                 TourStrip(model: model, reduceMotion: reduceMotion, onStep: onStep,
                           onClose: onClose, onOpen: onOpen)
-                    .frame(width: pane.width, height: pane.height - 14, alignment: .bottom)
+                    .frame(width: pane.width, height: max(pane.height - 14 - lift, 60), alignment: .bottom)
                     .offset(x: pane.minX, y: pane.minY)
             }
         }
@@ -209,6 +255,8 @@ private struct TourCaption: View {
     var compareNote: Bool
     /// Folded compare: one caption names both answers.
     var avoid: LabOption?
+    /// Folded compare is held to one pane while the keyboard is up.
+    var keyboardNote = false
 
     private var isAvoid: Bool { option.verdict == .avoid }
 
@@ -234,7 +282,11 @@ private struct TourCaption: View {
                     .font(.footnote)
                     .foregroundStyle(Verdict.avoid.color)
             }
-            if compareNote, step.avoid == nil {
+            if keyboardNote {
+                Text("Keyboard up: showing only the answer to use.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if compareNote, step.avoid == nil {
                 Text("Nothing to avoid in this topic, so there is no comparison.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -242,8 +294,11 @@ private struct TourCaption: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
+        // Glass alone turns muddy grey over dark video (Media, Laptop, Camera): a thin material
+        // under it keeps the text on a light (or, in dark mode, dark) ground everywhere.
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.1), radius: 10, y: 3)
+        .shadow(color: .black.opacity(0.16), radius: 12, y: 4)
         .accessibilityElement(children: .combine)
     }
 }
@@ -368,8 +423,9 @@ private struct TourStrip: View {
         .overlay(alignment: .bottom) {
             if !reduceMotion { progress }
         }
+        .background(.ultraThinMaterial, in: .capsule)
         .glassEffect(.regular.interactive(), in: .capsule)
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
+        .shadow(color: .black.opacity(0.16), radius: 12, y: 4)
         .fixedSize()
     }
 
@@ -402,7 +458,7 @@ private struct TourStrip: View {
 
     private var openButton: some View {
         Button(action: onOpen) {
-            Text(sizeClass == .regular ? "Open this topic" : "Open")
+            Text(sizeClass == .regular ? "Open this topic" : "Go to topic")
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 12)
                 .frame(height: 32)

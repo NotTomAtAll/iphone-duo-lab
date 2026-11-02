@@ -59,23 +59,41 @@ struct ReadingLabView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                        .frame(maxWidth: state.isOn("alignHeader") ? maxWidth : .infinity, alignment: .leading)
-                        .frame(maxWidth: .infinity, alignment: state.isOn("alignHeader") ? .center : .leading)
-                    Group {
-                        if state["content"] == "form" { form } else { article }
+            RegionReader { size, folds, _ in
+                let half = foldHalf(size: size, folds: folds)
+                let cap = half.map { min(maxWidth, $0.width - 32) } ?? maxWidth
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                            .frame(maxWidth: state.isOn("alignHeader") ? cap : .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: state.isOn("alignHeader") ? .center : .leading)
+                        Group {
+                            if state["content"] == "form" { form } else { article }
+                        }
+                        .frame(maxWidth: cap, alignment: .leading)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: maxWidth, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
-                    .frame(maxWidth: .infinity)
+                    .padding()
+                    // Book pose: the column sits in the wider half, clear of the fold.
+                    .frame(width: half?.width)
+                    .padding(.leading, half?.minX ?? 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding()
             }
             .navigationTitle("Reading")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    /// With a capped column and a vertical fold reported, the wider side of the fold.
+    private func foldHalf(size: CGSize, folds: [CGRect]) -> (minX: CGFloat, width: CGFloat)? {
+        guard state["width"] != "full",
+              let fold = folds.first(where: { $0.height > $0.width }),
+              fold.minX > 0, fold.maxX < size.width else { return nil }
+        let leading = fold.minX
+        let trailing = size.width - fold.maxX
+        return leading >= trailing ? (0, leading) : (fold.maxX, trailing)
     }
 
     private var header: some View {
