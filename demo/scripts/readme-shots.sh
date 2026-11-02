@@ -43,6 +43,9 @@ SHOT=(
   transitions   "-topic transitions -option zoom"
   topic-page    "-topic grids"
 )
+# Per-pose overrides (the open display shows the split with a topic selected).
+typeset -A SHOT_OPEN
+SHOT_OPEN=( home "-topic grids" )
 ORDER=(home topic-page tabbar tabbar-sidebar toolbars listdetail grids reading media overlays sheets hinge pitfalls continuity laptop motion toasts twopanes keyboard transitions device)
 NAMES=(${=SHOTS:-$ORDER})
 
@@ -52,7 +55,9 @@ for pose in open closed; do
   rocketsim duo pose $pose --udid "$UDID" >/dev/null; sleep 2
   display=primary-1; [[ $pose == closed ]] && display=primary
   for name in $NAMES; do
-    launch "${SHOT[$name]}"
+    args="${SHOT[$name]}"
+    [[ $pose == open && -n "${SHOT_OPEN[$name]:-}" ]] && args="${SHOT_OPEN[$name]}"
+    launch "$args"
     xcrun simctl io "$UDID" screenshot --display=$display "$RAW/$name-$pose.png" >/dev/null 2>&1
     echo "  $name-$pose"
   done

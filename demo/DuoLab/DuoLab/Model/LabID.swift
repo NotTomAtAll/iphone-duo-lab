@@ -19,6 +19,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
     case twoPanes = "twopanes"
     case keyboard = "keyboard"
     case transitions = "transitions"
+    case camera = "camera"
+    case narrowWindows = "narrow"
 
     var id: String { rawValue }
 
@@ -45,6 +47,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .twoPanes: "Two panes and drag"
         case .keyboard: "Keyboard per pose"
         case .transitions: "Transitions"
+        case .camera: "Camera per pose"
+        case .narrowWindows: "Small windows"
         }
     }
 
@@ -67,6 +71,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .twoPanes: "Can two screens live side by side, and can I drag between them?"
         case .keyboard: "Where does the keyboard go, and what happens to what I was typing?"
         case .transitions: "Which transitions feel right on a foldable, and which get in the way?"
+        case .camera: "Where do the preview and the shutter go when the phone is half open?"
+        case .narrowWindows: "What happens when the app gets a short or narrow window: Split View, a floating video, or the old compatibility size?"
         }
     }
 
@@ -89,6 +95,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .twoPanes: "rectangle.split.2x1"
         case .keyboard: "keyboard"
         case .transitions: "arrow.up.left.and.arrow.down.right"
+        case .camera: "camera"
+        case .narrowWindows: "rectangle.compress.vertical"
         }
     }
 
@@ -111,6 +119,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .twoPanes: []
         case .keyboard: []
         case .transitions: []
+        case .camera: []
+        case .narrowWindows: []
         }
     }
 
@@ -133,6 +143,8 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
         case .twoPanes: TwoPanesLab.knobs
         case .keyboard: KeyboardLab.knobs
         case .transitions: TransitionsLab.knobs
+        case .camera: CameraLab.knobs
+        case .narrowWindows: NarrowWindowsLab.knobs
         }
     }
 }

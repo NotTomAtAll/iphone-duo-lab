@@ -494,6 +494,8 @@ struct LabContent: View {
         case .twoPanes: TwoPanesLabView(state: state)
         case .keyboard: KeyboardLabView(state: state)
         case .transitions: TransitionsLabView(state: state)
+        case .camera: CameraLabView(state: state)
+        case .narrowWindows: NarrowWindowsLabView(state: state)
         }
     }
 }

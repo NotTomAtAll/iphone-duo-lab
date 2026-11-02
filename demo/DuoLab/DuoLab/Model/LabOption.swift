@@ -86,6 +86,8 @@ extension LabID {
         case .twoPanes: TwoPanesLab.options
         case .keyboard: KeyboardLab.options
         case .transitions: TransitionsLab.options
+        case .camera: CameraLab.options
+        case .narrowWindows: NarrowWindowsLab.options
         }
     }
 
@@ -116,6 +118,8 @@ extension LabID {
         case .twoPanes: "Use the extra space for a second level of hierarchy or a companion pane, and let people move things between the two halves."
         case .keyboard: "Keep the field you are typing in visible above the keyboard in every pose, and keep the keyboard up across a fold."
         case .transitions: "Use the system transitions: zoom from the thing you tapped, and plain pushes. Keep them short on the big display."
+        case .camera: "Half open on a table, the preview belongs in the upright half and the controls in the flat half; closed, it is a normal camera."
+        case .narrowWindows: "Design for the size you are given, not the display. A compact, short or narrow window must still work."
         }
     }
 
@@ -138,6 +142,8 @@ extension LabID {
         case .twoPanes: "Two panes"
         case .keyboard: "Keyboard"
         case .transitions: "Transitions"
+        case .camera: "Camera"
+        case .narrowWindows: "Small windows"
         }
     }
 }
