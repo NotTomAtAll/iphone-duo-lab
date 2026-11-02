@@ -1,0 +1,53 @@
+import Foundation
+
+/// The technical side of each option, kept out of the main copy and shown under "How it's built".
+extension LabOption {
+    static let buildNotes: [String: String] = [
+        "tabbar/native": "TabView with Tab items, default placement.",
+        "tabbar/sidebar": "TabView with .tabViewStyle(.sidebarAdaptable) and .defaultTabBarPlacement(.sidebar).",
+        "tabbar/minimize": ".tabBarMinimizeBehavior(.onScrollDown).",
+        "tabbar/accessory": ".tabViewBottomAccessory { … }.",
+        "tabbar/hide-on-push": ".toolbarVisibility(.hidden, for: .tabBar) on the pushed screen.",
+        "toolbars/system": ".toolbar items inside a NavigationStack.",
+        "toolbars/system-bottom": "ToolbarItemGroup(placement: .bottomBar).",
+        "toolbars/compact": ".navigationBarTitleDisplayMode(.inline) and four ToolbarItems.",
+        "toolbars/custom": "A hand-built HStack instead of .toolbar.",
+        "listdetail/split": "NavigationSplitView, two columns, columnVisibility .all.",
+        "listdetail/three-column": "NavigationSplitView with sidebar, content and detail.",
+        "listdetail/prominent-detail": ".navigationSplitViewStyle(.prominentDetail).",
+        "listdetail/stack": "NavigationStack with a pushed destination.",
+        "grids/adaptive-even": "LazyVGrid; column count from width ÷ 160 pt, rounded down to even.",
+        "grids/adaptive-large": "LazyVGrid; column count from width ÷ 220 pt, rounded down to even.",
+        "grids/carousel-rows": "Horizontal ScrollView rows with a gradient mask.",
+        "grids/fixed-two": "LazyVGrid with two fixed columns.",
+        "grids/carousel-clip": "One horizontal ScrollView, no edge treatment.",
+        "reading/column": ".frame(maxWidth: 560) on text and title.",
+        "reading/form": ".frame(maxWidth: 480) on the form.",
+        "reading/full-width": "No width cap.",
+        "reading/misaligned": "Width cap on the body only.",
+        "media/arrangement-split": "ArrangementView with .arrangementViewStyle(.split) (iOS 27.1).",
+        "media/arrangement-overlay": "ArrangementView with .arrangementViewStyle(.overlay) (iOS 27.1).",
+        "media/fixed-panel": "HStack with a 320 pt panel.",
+        "media/full-bleed": "Split layout; video background uses .ignoresSafeArea().",
+        "media/sheet": "Video with a .sheet for chat.",
+        "overlays/fold-aware": "GeometryProxy.reservedRegions(kind: .division / .occlusion) to place the bubble and controls.",
+        "overlays/split-controls": "Two control groups placed either side of the .division region.",
+        "overlays/unaware": "Fixed positions; no reserved-region checks.",
+        "sheets/sheet-form": ".sheet with .presentationSizing(.form).",
+        "sheets/sheet-page": ".sheet with .presentationSizing(.page).",
+        "sheets/popover": ".popover with .presentationCompactAdaptation(.popover).",
+        "sheets/alert": ".alert.",
+        "sheets/dialog": ".confirmationDialog.",
+        "sheets/menu": "Menu.",
+        "hinge/book": "onHingeChange → angle drives a 3D rotation.",
+        "hinge/lamp": "onHingeChange → angle drives a light gradient.",
+        "hinge/tilt": "onHingeChange → angle drives a card tilt.",
+        "antipatterns/screen-size": "Broken: the screen's bounds. Fixed: GeometryReader container size.",
+        "antipatterns/symmetric-insets": "Broken: width − leading × 2. Fixed: pad each edge by its own inset.",
+        "antipatterns/cached-insets": "Broken: insets read once at launch. Fixed: GeometryProxy.safeAreaInsets.",
+        "antipatterns/orientation": "Broken: interfaceOrientation. Fixed: horizontalSizeClass.",
+        "antipatterns/clamp": "Broken: .frame(maxWidth: 480) on the whole app. Fixed: adaptive layout.",
+    ]
+
+    func buildNote(in lab: LabID) -> String? { Self.buildNotes["\(lab.rawValue)/\(id)"] }
+}
