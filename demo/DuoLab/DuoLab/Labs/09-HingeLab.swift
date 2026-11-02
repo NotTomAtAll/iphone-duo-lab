@@ -239,7 +239,8 @@ private struct HingeScreen<Header: View, Controls: View>: View {
     @ViewBuilder let controls: Controls
 
     var body: some View {
-        GeometryReader { proxy in
+        RegionReader { size, folds, _ in
+            let proxy = (size: size, fold: folds.first { $0.height > $0.width })
             let columns = layoutFromAngle ? (angle >= 90 ? 2 : 1) : (proxy.size.width >= 700 ? 2 : 1)
             ScrollView {
                 VStack(spacing: 16) {
@@ -252,18 +253,17 @@ private struct HingeScreen<Header: View, Controls: View>: View {
                          : "\(columns) column\(columns == 1 ? "" : "s"), from the \(Int(proxy.size.width)) pt the screen has")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(layoutFromAngle ? .red : .green)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
-                        ForEach(0..<12, id: \.self) { index in
-                            HStack(spacing: 12) {
-                                Tile(index: index, showsCaption: false).frame(width: 56, height: 56)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(Placeholder.name(index)).font(.headline)
-                                    Text(Placeholder.sentence).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .padding(10)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    if columns == 2, let fold = proxy.fold {
+                        // Two columns with the gap on the fold, so no row straddles it.
+                        HStack(alignment: .top, spacing: 0) {
+                            VStack(spacing: 12) { ForEach(Array(stride(from: 0, to: 12, by: 2)), id: \.self) { row($0) } }
+                                .frame(width: max(fold.minX - 16, 120))
+                            Spacer(minLength: fold.width)
+                            VStack(spacing: 12) { ForEach(Array(stride(from: 1, to: 12, by: 2)), id: \.self) { row($0) } }
+                        }
+                    } else {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
+                            ForEach(0..<12, id: \.self) { row($0) }
                         }
                     }
                 }
@@ -271,5 +271,18 @@ private struct HingeScreen<Header: View, Controls: View>: View {
             }
         }
         .background(Color(.systemBackground))
+    }
+
+    private func row(_ index: Int) -> some View {
+        HStack(spacing: 12) {
+            Tile(index: index, showsCaption: false).frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Placeholder.name(index)).font(.headline)
+                Text(Placeholder.sentence).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
     }
 }
