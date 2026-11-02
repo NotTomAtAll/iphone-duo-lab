@@ -30,6 +30,8 @@ struct OptionThumbnail: View {
     let pose: PreviewPose
     private let renderer = ThumbnailRenderer.shared
     @Environment(\.colorScheme) private var scheme
+    @State private var radius: CGFloat = 14
+    @State private var stalled: String?
 
     init(lab: LabID, option: LabOption, pose: PreviewPose, tweaks: [String: String] = [:]) {
         self.lab = lab
@@ -37,26 +39,57 @@ struct OptionThumbnail: View {
         self.values = option.knobs.merging(tweaks) { $1 }
     }
 
+    private var key: String { ThumbnailRenderer.key(lab: lab, values: values, pose: pose, scheme: scheme) }
+
     var body: some View {
         let canvas = pose.canvas
-        let image = renderer.images[ThumbnailRenderer.key(lab: lab, values: values, pose: pose, scheme: scheme)]
+        let key = key
+        let image = renderer.images[key]
+        let gaveUp = image == nil && (renderer.failed.contains(key) || stalled == key)
         Color(.secondarySystemBackground)
             .aspectRatio(canvas.width / canvas.height, contentMode: .fit)
             .overlay {
                 if let image {
                     Image(uiImage: image).resizable().interpolation(.high).transition(.opacity)
+                } else if gaveUp {
+                    Button("Try again", systemImage: "arrow.clockwise") {
+                        stalled = nil
+                        renderer.retry(lab: lab, values: values, pose: pose, scheme: scheme)
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(.rect)
                 } else {
                     ProgressView()
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            // Small thumbnails (list rows) get a smaller radius so the corner doesn't eat the first letter.
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(.separator, lineWidth: 0.5)
             )
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { radius = min(14, max(6, $0 / 16)) }
             .animation(.easeOut(duration: 0.2), value: image != nil)
-            .onAppear { renderer.request(lab: lab, values: values, pose: pose, scheme: scheme) }
-            .onChange(of: scheme) { _, new in renderer.request(lab: lab, values: values, pose: pose, scheme: new) }
+            // Keyed on the variant, so a pose or appearance flip re-requests even for a card that
+            // never left the screen (onAppear would not fire again for it).
+            .task(id: key) {
+                stalled = nil
+                renderer.request(lab: lab, values: values, pose: pose, scheme: scheme)
+                // Watchdog: a card still empty after a while jumps the line once, then offers a retry.
+                for attempt in 0..<2 {
+                    try? await Task.sleep(for: .seconds(8))
+                    guard !Task.isCancelled, renderer.images[key] == nil else { return }
+                    if attempt == 0 {
+                        renderer.retry(lab: lab, values: values, pose: pose, scheme: scheme)
+                    } else {
+                        stalled = key
+                    }
+                }
+            }
+            .onDisappear { renderer.demote(key) }
             .accessibilityHidden(true)
     }
 

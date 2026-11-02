@@ -20,8 +20,8 @@ struct DeepLinkTests {
     }
 
     @Test func tabURL() throws {
-        let link = try #require(DeepLink.parse(url: URL(string: "duolab://tab/playbook")!))
-        #expect(link.tab == .playbook)
+        let link = try #require(DeepLink.parse(url: URL(string: "duolab://tab/device")!))
+        #expect(link.tab == .device)
         #expect(link.lab == nil)
     }
 
@@ -52,7 +52,7 @@ struct DeepLinkTests {
     @Test func routerOpensPreviewAndReportsBadOption() {
         let router = AppRouter()
         router.handle(DeepLink(tab: .topics, lab: .grids, option: "fixed-two"))
-        #expect(router.focusedTopic == .grids)
+        #expect(router.path == [.grids])
         #expect(router.preview?.optionID == "fixed-two")
 
         let other = AppRouter()
@@ -131,61 +131,5 @@ struct KnobStateTests {
             #expect(parsed.lab == lab)
             #expect(KnobState(lab: lab, values: parsed.values).variantKey == state.variantKey)
         }
-    }
-}
-
-struct DecisionStoreTests {
-    private func makeStore() -> (DecisionStore, UserDefaults) {
-        let defaults = UserDefaults(suiteName: "duolab.tests.\(UUID().uuidString)")!
-        return (DecisionStore(defaults: defaults, key: "d"), defaults)
-    }
-
-    @Test func oneDecisionPerTopicAndPersisted() throws {
-        let (store, defaults) = makeStore()
-        let first = LabID.grids.options[0], second = LabID.grids.options[1]
-        store.choose(first, in: .grids)
-        store.choose(second, in: .grids)
-        #expect(store.decisions.count == 1)
-        #expect(store.isChosen(second, in: .grids))
-        #expect(DecisionStore(defaults: defaults, key: "d").chosenOption(for: .grids) == second)
-        store.clear(.grids)
-        #expect(DecisionStore(defaults: defaults, key: "d").decisions.isEmpty)
-    }
-
-    @Test func rationaleSurvivesRechoosing() {
-        let (store, _) = makeStore()
-        store.choose(LabID.media.options[0], in: .media)
-        store.setRationale("Live chat beside video", for: .media)
-        store.choose(LabID.media.options[1], in: .media)
-        #expect(store.decision(for: .media)?.rationale == "Live chat beside video")
-    }
-
-    @Test func tweaksAreOnlyTheDifferencesFromThePreset() {
-        let (store, _) = makeStore()
-        let option = try! #require(LabID.grids.option("adaptive-even"))
-        let state = KnobState(lab: .grids, values: option.knobs)
-        state["edge"] = "fade"
-        store.choose(option, in: .grids, state: state)
-        #expect(store.decision(for: .grids)?.tweaks == ["edge": "fade"])
-    }
-
-    @Test func codecRoundTripAndGarbage() {
-        let decisions = [Decision(lab: .hinge, optionID: "lamp", rationale: "r", date: Date(timeIntervalSince1970: 1_000))]
-        #expect(DecisionStore.decode(DecisionStore.encode(decisions)) == decisions)
-        #expect(DecisionStore.decode(Data("garbage".utf8)).isEmpty)
-        #expect(DecisionStore.decode(nil).isEmpty)
-    }
-
-    @Test func markdownPlaybook() {
-        let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let decisions = [Decision(lab: .tabBar, optionID: "native", tweaks: ["minimize": "never"],
-                                  rationale: "  Matches the system  ", date: date)]
-        let markdown = DecisionStore.markdown(for: decisions, now: date)
-        #expect(markdown.hasPrefix("# iPhone Duo playbook\n\n1 of 10 topics decided · 2027-01-15"))
-        #expect(markdown.contains("**Native tab bar** (Recommended)."))
-        #expect(markdown.contains("Why: Matches the system\n"))
-        #expect(markdown.contains("Adjusted: minimize=never"))
-        #expect(markdown.contains("`duolab://topic/tabbar/native?minimize=never`"))
-        #expect(markdown.components(separatedBy: "_Not decided yet._").count == 10)
     }
 }

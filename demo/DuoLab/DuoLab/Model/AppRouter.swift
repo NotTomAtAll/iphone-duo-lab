@@ -6,16 +6,28 @@ struct PreviewTarget: Identifiable, Hashable {
     let lab: LabID
     let optionID: String
     var knobs: [String: String] = [:]
+    var entrance: PreviewEntrance = .system
 
     var id: String { "\(lab.rawValue)/\(optionID)" }
+}
+
+/// How an opened option arrives and leaves.
+enum PreviewEntrance: Hashable {
+    /// The card grows into the screen. Only when its picture is of the display the user is on,
+    /// so the first and last frames of the morph are the same picture.
+    case zoom
+    /// A quick fade and settle, when the card shows the other display (a wide picture cannot
+    /// morph into a tall screen without looking wrong).
+    case fade
+    /// The default cover slide, for deep links that have no card to come from.
+    case system
 }
 
 /// App-wide navigation.
 @Observable
 final class AppRouter {
     var tab: RootTab = .topics
-    /// A topic the gallery should scroll to.
-    var focusedTopic: LabID?
+    var path: [LabID] = []
     var preview: PreviewTarget?
     /// The measuring overlay (safe area, fold, cameras, readout).
     var measure = false
@@ -25,7 +37,7 @@ final class AppRouter {
 
     func openTopic(_ lab: LabID) {
         tab = .topics
-        focusedTopic = lab
+        path = [lab]
     }
 
     func preview(_ option: LabOption, in lab: LabID) {
@@ -37,7 +49,7 @@ final class AppRouter {
         if let measure = link.measure { self.measure = measure }
         if let tab = link.tab { self.tab = tab }
         if let lab = link.lab {
-            focusedTopic = lab
+            path = [lab]
             if let optionID = link.option {
                 if let option = lab.option(optionID) {
                     let preset = KnobState(lab: lab, values: option.knobs)

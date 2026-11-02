@@ -96,5 +96,5 @@ enum LabID: String, CaseIterable, Identifiable, Codable, Sendable {
 }
 
 enum RootTab: String, CaseIterable, Hashable, Sendable {
-    case topics, playbook, device
+    case topics, device
 }

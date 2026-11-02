@@ -137,7 +137,7 @@ App-agnostic. Each item is a thing to check, decide, or build. Nested points are
 - [defaultTabBarPlacement](https://developer.apple.com/documentation/swiftui/view/defaulttabbarplacement(_:)), [TabBarMinimizeBehavior](https://developer.apple.com/documentation/swiftui/tabbarminimizebehavior), [tabViewBottomAccessory](https://developer.apple.com/documentation/swiftui/view/tabviewbottomaccessory(content:)).
 - [safeAreaBar](https://developer.apple.com/documentation/swiftui/view/safeareabar(edge:alignment:spacing:content:)), [scrollEdgeEffectStyle](https://developer.apple.com/documentation/swiftui/view/scrolledgeeffectstyle(_:for:)).
 - UIKit: [UITab](https://developer.apple.com/documentation/uikit/uitab), [UITabBarController.Mode](https://developer.apple.com/documentation/uikit/uitabbarcontroller/mode-swift.enum), [Elevating your iPad app with a tab bar and sidebar](https://developer.apple.com/documentation/uikit/elevating-your-ipad-app-with-a-tab-bar-and-sidebar), [TN3106 navigation bar appearance](https://developer.apple.com/documentation/technotes/tn3106-customizing-uinavigationbar-appearance).
-- WWDC25: [284 Build a SwiftUI app with the new design](https://developer.apple.com/videos/play/wwdc2025/284/), [323 Build a UIKit app with the new design](https://developer.apple.com/videos/play/wwdc2025/323/).
+- WWDC25: [284 Build a UIKit app with the new design](https://developer.apple.com/videos/play/wwdc2025/284/), [323 Build a SwiftUI app with the new design](https://developer.apple.com/videos/play/wwdc2025/323/).
 
 ### Community, useful but verify
 - [adapty.io: adapt your iOS app to iPhone Duo](https://adapty.io/blog/adapt-your-ios-app-to-iphone-duo/).

@@ -1,36 +1,81 @@
 import SwiftUI
 
-/// An option running live and full screen, with glass controls to page, learn more and choose.
+/// An option running live and full screen, with a floating glass bar you can drag anywhere.
 struct PreviewScreen: View {
     let lab: LabID
+    let entrance: PreviewEntrance
+    /// The option whose card was tapped; the zoom always returns to that card.
+    let openedIndex: Int
     @State private var index: Int
     @State private var state: KnobState
     @State private var showsInfo = false
+    /// False while arriving or leaving: the zoom shows the card's picture, the fade shows nothing.
+    @State private var settled: Bool
+    @State private var closing = false
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     init(target: PreviewTarget) {
         lab = target.lab
+        entrance = target.entrance
         let index = target.lab.options.firstIndex { $0.id == target.optionID } ?? 0
         _index = State(initialValue: index)
+        openedIndex = index
         let state = KnobState(lab: target.lab, values: target.lab.options[index].knobs)
         state.apply(target.knobs)
         _state = State(initialValue: state)
+        _settled = State(initialValue: target.entrance == .system)
     }
 
     private var option: LabOption { lab.options[index] }
 
+    /// The card's picture of the current option on this display, if it has been rendered.
+    private var cardImage: UIImage? {
+        let pose: PreviewPose = sizeClass == .regular ? .open : .folded
+        return ThumbnailRenderer.shared.images[
+            ThumbnailRenderer.key(lab: lab, values: option.knobs, pose: pose, scheme: scheme)]
+    }
+
     var body: some View {
-        // A layout split, not an overlay: the option gets a slightly shorter window and the
-        // controls sit below it, so none of the option's own bars end up underneath.
-        VStack(spacing: 0) {
+        let fades = entrance == .fade
+        // Every arrival/leave animation is scoped to opacity and scale only: an unscoped
+        // withAnimation here would also animate the live view's first layout (tiles grow in).
+        let speed = Animation.easeOut(duration: entrance == .zoom ? 0.2 : 0.24)
+        ZStack {
             LabContent(lab: lab, state: state)
                 .id(index)
-            PreviewControls(lab: lab, option: option, index: index, state: state,
-                            onClose: { dismiss() }, onStep: step, onInfo: { showsInfo = true })
+            // Zoom: the first and last frames are the card's own picture, so the morph is seamless;
+            // the live view (whose bars lay out a beat later) cross-fades in underneath.
+            if entrance == .zoom, let image = cardImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .animation(speed) { $0.opacity(settled ? 0 : 1) }
+            }
         }
         .background(Color(.systemBackground))
+        .animation(speed) {
+            $0.opacity(fades && !settled ? 0 : 1)
+                .scaleEffect(fades && !settled ? 0.97 : 1)
+        }
+        .overlay {
+            FloatingBar {
+                OptionBarContent(lab: lab, option: option, index: index, state: state,
+                                 onClose: close, onStep: step, onInfo: { showsInfo = true })
+            }
+            .animation(speed) { $0.opacity(settled ? 1 : 0) }
+        }
         .sheet(isPresented: $showsInfo) { OptionInfoSheet(lab: lab, option: option, state: state) }
         .duoChrome()
+        .task {
+            guard !settled else { return }
+            // Zoom: let the morph finish on the picture. Fade: wait one layout pass.
+            try? await Task.sleep(for: .milliseconds(entrance == .zoom ? 380 : 30))
+            settled = true
+        }
     }
 
     private func step(_ delta: Int) {
@@ -40,10 +85,84 @@ struct PreviewScreen: View {
             state = KnobState(lab: lab, values: lab.options[index].knobs)
         }
     }
+
+    /// The arrival played backwards: back to the picture (zoom) or out (fade), then go.
+    private func close() {
+        guard !closing else { return }
+        closing = true
+        switch entrance {
+        case .system:
+            dismiss()
+        case .zoom:
+            // Only swap to the card's picture when it shows what is on screen: same option, knobs
+            // untouched. Otherwise the live view zooms back into the card the user came from.
+            let matches = index == openedIndex
+                && state.variantKey == KnobState(lab: lab, values: option.knobs).variantKey
+            guard matches, cardImage != nil else { return dismiss() }
+            settled = false
+            Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                dismiss()
+            }
+        case .fade:
+            settled = false
+            Task {
+                try? await Task.sleep(for: .milliseconds(240))
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { router.preview = nil }
+            }
+        }
+    }
 }
 
-/// Close · ‹ option › · info · Use this, in Liquid Glass.
-struct PreviewControls: View {
+/// Floats its content over the screen. Drag it and it snaps to the nearest of six spots
+/// (top or bottom; leading, center or trailing), remembered across launches.
+struct FloatingBar<Content: View>: View {
+    @ViewBuilder let content: Content
+    @AppStorage("duolab.barSpot") private var spot = 3
+    @State private var drag: CGSize = .zero
+    @State private var size: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { proxy in
+            let base = point(spot, in: proxy.size)
+            content
+                .fixedSize()
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+                .position(x: base.x + drag.width, y: base.y + drag.height)
+                .gesture(
+                    DragGesture(minimumDistance: 6)
+                        .onChanged { drag = $0.translation }
+                        .onEnded { value in
+                            let end = CGPoint(x: base.x + value.translation.width, y: base.y + value.translation.height)
+                            let nearest = (0..<6).min { a, b in
+                                distance(point(a, in: proxy.size), end) < distance(point(b, in: proxy.size), end)
+                            } ?? spot
+                            withAnimation(.snappy) {
+                                spot = nearest
+                                drag = .zero
+                            }
+                        }
+                )
+                .sensoryFeedback(.impact(weight: .light), trigger: spot)
+        }
+    }
+
+    /// Spots 0–2 along the top, 3–5 along the bottom; leading, center, trailing.
+    private func point(_ spot: Int, in container: CGSize) -> CGPoint {
+        let margin: CGFloat = 14
+        let half = CGSize(width: size.width / 2, height: size.height / 2)
+        let xs = [margin + half.width, container.width / 2, container.width - margin - half.width]
+        let ys = [margin + half.height, container.height - margin - half.height]
+        return CGPoint(x: xs[spot % 3], y: ys[spot / 3])
+    }
+
+    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
+}
+
+/// Close · ‹ option › · info, in one glass capsule.
+struct OptionBarContent: View {
     let lab: LabID
     let option: LabOption
     let index: Int
@@ -51,84 +170,42 @@ struct PreviewControls: View {
     var onClose: () -> Void
     var onStep: (Int) -> Void
     var onInfo: () -> Void
-    @Environment(DecisionStore.self) private var decisions
-    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        let chosen = decisions.isChosen(option, in: lab)
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             if let id = option.highlight, let spec = state.spec(id) {
                 Picker(spec.title, selection: Binding(get: { state[id] }, set: { state[id] = $0 })) {
                     ForEach(spec.options, id: \.value) { Text($0.label).tag($0.value) }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 260)
+                .frame(width: 220)
+                .padding(5)
+                .glassEffect(.regular, in: .capsule)
             }
-            GlassEffectContainer(spacing: 10) {
-                HStack(spacing: 10) {
-                    Button("Close", systemImage: "xmark", action: onClose)
-                        .labelStyle(.iconOnly)
-                        .buttonBorderShape(.circle)
-                        .buttonStyle(.glass)
-                        .controlSize(.large)
-
-                    HStack(spacing: 2) {
-                        Button("Previous", systemImage: "chevron.left") { onStep(-1) }
-                            .labelStyle(.iconOnly)
-                            .frame(width: 36, height: 44)
-                        VStack(spacing: 1) {
-                            Text(option.title)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Text("\(index + 1) of \(lab.options.count)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: 240)
-                        Button("Next", systemImage: "chevron.right") { onStep(1) }
-                            .labelStyle(.iconOnly)
-                            .frame(width: 36, height: 44)
-                    }
-                    .padding(.horizontal, 4)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-
-                    Button("About this option", systemImage: "info", action: onInfo)
-                        .labelStyle(.iconOnly)
-                        .buttonBorderShape(.circle)
-                        .buttonStyle(.glass)
-                        .controlSize(.large)
-
-                    useButton(chosen: chosen)
+            HStack(spacing: 2) {
+                Button("Close", systemImage: "xmark", action: onClose)
+                    .frame(width: 40, height: 44)
+                Button("Previous", systemImage: "chevron.left") { onStep(-1) }
+                    .frame(width: 34, height: 44)
+                VStack(spacing: 1) {
+                    Text(option.title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text("\(option.verdict.title) · \(index + 1) of \(lab.options.count)")
+                        .font(.caption2)
+                        .foregroundStyle(option.verdict.color)
                 }
+                .frame(maxWidth: 200)
+                Button("Next", systemImage: "chevron.right") { onStep(1) }
+                    .frame(width: 34, height: 44)
+                Button("About this option", systemImage: "info.circle", action: onInfo)
+                    .frame(width: 40, height: 44)
             }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-        .frame(maxWidth: .infinity)
-        .sensoryFeedback(.success, trigger: chosen) { _, new in new }
-    }
-
-    @ViewBuilder
-    private func useButton(chosen: Bool) -> some View {
-        let action = {
-            withAnimation(.snappy) {
-                if chosen { decisions.clear(lab) } else { decisions.choose(option, in: lab, state: state) }
-            }
-        }
-        let title = chosen ? "Using this" : "Use this"
-        let symbol = chosen ? "checkmark.circle.fill" : "checkmark.circle"
-        if sizeClass == .compact {
-            Button(title, systemImage: symbol, action: action)
-                .labelStyle(.iconOnly)
-                .buttonBorderShape(.circle)
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-        } else {
-            Button(title, systemImage: symbol, action: action)
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
+            .labelStyle(.iconOnly)
+            .font(.body.weight(.semibold))
+            .padding(.horizontal, 6)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
         }
     }
 }
