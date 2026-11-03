@@ -126,9 +126,13 @@ struct FoldColumns<Header: View, Row: View, Fallback: View>: View {
     /// Space kept clear on each side of the fold.
     private var gap: CGFloat { 12 }
 
+    /// Thumbnails pass a stand-in fold for the open display; this split only answers the real
+    /// book pose, so a miniature shows the plain list (the topic's point is the bar, not the rows).
+    @Environment(\.isThumbnail) private var isThumbnail
+
     var body: some View {
         RegionReader { size, folds, _ in
-            if let fold = folds.first(where: { $0.height > $0.width }),
+            if !isThumbnail, let fold = folds.first(where: { $0.height > $0.width }),
                fold.minX > 240, size.width - fold.maxX > 240 {
                 ScrollView {
                     HStack(alignment: .top, spacing: 0) {
