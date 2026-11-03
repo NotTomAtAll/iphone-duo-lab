@@ -47,7 +47,7 @@ The thumbnails are rendered in hidden windows behind the app, in light and dark 
 
 ✓ = Recommended, ✗ = Avoid, unmarked = Worth a try unless noted.
 
-Capture switches: `-duolab.hideBar 1` hides the lab controls, `-duolab.timeline 1` logs a launch-to-first-touch timeline, `-duolab.present 1` opens a presentation at launch, `-duolab.pinToast 1` shows a toast at launch, `-duolab.focusComposer 1` focuses the keyboard lab's field, `-reachOverlay 1` shows the reach bands.
+Capture switches: `-duolab.hideBar 1` hides the lab controls, `-duolab.present 1` opens a presentation at launch, `-duolab.pinToast 1` shows a toast at launch, `-duolab.focusComposer 1` focuses the keyboard lab's field, `-reachOverlay 1` shows the reach bands.
 
 ## Deep links and launch args
 

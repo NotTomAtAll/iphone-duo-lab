@@ -38,7 +38,7 @@ struct TourScreen: View {
                 // Added in UIKit, so the lab's own bars and lists see it too.
                 InsetHost(content: TourLive(lab: step.lab, option: step.option).environment(router),
                           extra: UIEdgeInsets(top: captionHeight + 20, left: 0,
-                                              bottom: (UserDefaults.standard.bool(forKey: "duolab.hideBar") ? 0 : 64) + keyboardLift,
+                                              bottom: (UserDefaults.standard.bool(forKey: "duolab.hideTourStrip") ? 0 : 64) + keyboardLift,
                                               right: 0))
                     .ignoresSafeArea()
                     .id("single-\(step.id)")
@@ -154,7 +154,9 @@ private struct TourOverlay: View {
     /// Room kept free at the bottom for the strip while comparing.
     private let stripRoom: CGFloat = 80
 
-    private var hidesStrip: Bool { UserDefaults.standard.bool(forKey: "duolab.hideBar") }
+    /// Captures only: `-duolab.hideTourStrip 1`. Not tied to the lab bar's capture flag, so a
+    /// leftover `-duolab.hideBar` can never leave someone in a tour without controls.
+    private var hidesStrip: Bool { UserDefaults.standard.bool(forKey: "duolab.hideTourStrip") }
 
     private var slide: AnyTransition {
         guard !reduceMotion else { return .opacity }
@@ -184,6 +186,15 @@ private struct TourOverlay: View {
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onCaptionHeight($0) }
                     .id("caption-\(step.id)")
                     .transition(slide)
+                    .contentShape(.rect)
+                    // Swipe the caption card to change step: left for next, right for back.
+                    .gesture(DragGesture(minimumDistance: 24).onEnded { value in
+                        let dx = value.translation.width
+                        guard abs(dx) > 50, abs(dx) > abs(value.translation.height) else { return }
+                        onStep(dx < 0 ? 1 : -1)
+                    })
+                    .accessibilityAction(named: "Next topic") { onStep(1) }
+                    .accessibilityAction(named: "Previous topic") { onStep(-1) }
                     .offset(x: pane.minX + margin, y: pane.minY + 12)
             }
             if !hidesStrip {

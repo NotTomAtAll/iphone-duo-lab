@@ -116,11 +116,9 @@ final class ThumbnailRenderer {
             let job = queue.removeFirst()
             guard images[job.key] == nil, !inFlight.contains(job.key) else { continue }
             inFlight.insert(job.key)
-            LaunchTimeline.mark("thumb start \(job.key.prefix(40)) slot \(slot)")
             let start = ContinuousClock.now
             let image = await render(job, slot: slot)
             inFlight.remove(job.key)
-            LaunchTimeline.mark("thumb end slot \(slot)")
             if let image {
                 images[job.key] = image
                 saveToDisk(image, key: job.key)

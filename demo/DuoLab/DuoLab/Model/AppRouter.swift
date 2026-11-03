@@ -106,7 +106,6 @@ final class AppRouter {
     }
 
     func handle(_ link: DeepLink) {
-        LaunchTimeline.mark("router.handle")
         var problems = link.errors
         if let measure = link.measure { self.measure = measure }
         if let tab = link.tab { self.tab = tab }

@@ -54,7 +54,6 @@ NAMES=(${=SHOTS:-$ORDER})
 
 launch() {
   local hide="-duolab.hideBar 1"
-  [[ $1 == *"-tour 1"* ]] && hide=""   # the tour strip is part of the picture
   xcrun simctl launch --terminate-running-process "$UDID" $BUNDLE -measure 0 ${=hide} ${=1} >/dev/null; sleep $WAIT
 }
 

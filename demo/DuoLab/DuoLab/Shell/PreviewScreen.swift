@@ -53,7 +53,6 @@ struct PreviewScreen: View {
         ZStack {
             LabContent(lab: lab, state: state)
                 .id(index)
-                .launchTimelineTaps("preview content")
             // The first frame is the picture, so there is no frame of the live view laid out at the
             // wrong width; the live view (whose bars lay out a beat later) cross-fades in underneath.
             if let picture, !leaving || entrance == .zoom {
@@ -78,7 +77,7 @@ struct PreviewScreen: View {
             if !UserDefaults.standard.bool(forKey: "duolab.hideBar") {
                 FloatingBar(compactTop: lab.barCompactTop, paused: showsInfo) { touched in
                     OptionBarContent(lab: lab, option: option, index: index, state: state, onTouch: touched,
-                                     onClose: close, onStep: step, onInfo: { LaunchTimeline.mark("info tapped"); showsInfo = true })
+                                     onClose: close, onStep: step, onInfo: { showsInfo = true })
                 } handle: {
                     BarHandle(lab: lab, option: option, index: index, adjusted: state.differs(from: option))
                 }
@@ -87,9 +86,7 @@ struct PreviewScreen: View {
         }
         .sheet(isPresented: $showsInfo) { OptionInfoSheet(lab: lab, option: option, state: state) }
         .duoChrome(includesReach: false)
-        .onAppear { LaunchTimeline.mark("preview appear \(lab.rawValue)") }
         .task {
-            LaunchTimeline.mark("preview task")
             // Hold the background thumbnail work while this screen arrives: each render shows a
             // hidden window and forces a screen update, which slows the arrival down. Opened by a
             // link, the pictures are for the topic page underneath, which nobody sees yet: let the
@@ -259,7 +256,6 @@ struct FloatingBar<Content: View, Handle: View>: View {
     }
 
     private func touched() {
-        LaunchTimeline.mark("bar touched")
         collapsed = false
         activity += 1
     }
