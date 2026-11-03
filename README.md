@@ -2,24 +2,7 @@
 
 **Try every iPhone Duo layout decision live, then pick the one that works.**
 
-DuoLab is a SwiftUI app for Apple's foldable iPhone. Nineteen questions every app has to answer on a device that folds, each with the realistic answers side by side, a verdict for each, and the reasoning behind it. Open an answer full screen, fold and unfold the simulator, and see what actually happens.
-
 ![DuoLab on the open and the folded display](docs/images/home.png)
-
-## Run it
-
-Xcode 27.1 · iPhone Duo simulator · no dependencies.
-
-```bash
-open demo/DuoLab/DuoLab.xcodeproj
-```
-
-Pick an iPhone Duo simulator, run, then change the pose in Device Hub (Closed, Partially Open, Open) and watch the layouts react. Jump straight to any answer with a link:
-
-```
-duolab://topic/grids/adaptive-even
-xcrun simctl launch booted com.example.duolab -topic media -option arrangement-split
-```
 
 ## The questions
 
@@ -48,18 +31,16 @@ New to the device? **Start the tour** on the home screen plays every topic's rec
 
 ## What the simulator taught us
 
-Measured on the iPhone Duo simulator, iOS 27.1, and baked into the verdicts:
-
-- **The inner display is regular × regular**, like an iPad, and it ignores a portrait-only orientation lock.
-- **The status bar and cameras live in an 84 pt strip on the trailing edge** of both displays; the window's top inset is 0. Anything sized from the screen instead of its container runs under that strip.
-- **The fold is reported only when the device is partly open.** Fully open, the division region exists but is inactive, so fold avoidance must check `isActive`.
-- **The native tab bar stands upright in that strip in every pose**, and `tabBarMinimizeBehavior` does nothing there.
-- **A three-column split view shows two columns** on the inner display.
-- **Toolbar items, prominent and secondary, move into the strip** when folded; a custom bar stays a horizontal stripe next to it.
-- **In book pose the keyboard splits into two halves around the fold**, and it stays up across a fold as long as the field survives the layout change.
-- **Every sheet stays in one half in book pose.** Form, page and custom sizes all land in the leading half unless placed trailing; nothing spans the fold.
-- **A tab bar's minimize-on-scroll does nothing**, and when space runs out the system drops toolbar items first unless the screen says it prefers them.
-- **The simulator can't make the laptop pose** (a horizontal fold): rotating the open device changes the reported orientation but the window and the fold stay put. Laptop layouts in DuoLab are simulated and say so.
+- **Inner display is regular × regular**, like an iPad.
+- **Status bar and cameras sit in an 84 pt side strip.**
+- **The fold registers only when half open.**
+- **Tab bar stays upright in the side strip**, always.
+- **Minimize-on-scroll does nothing on Duo.**
+- **Three-column split views show two columns.**
+- **Toolbar items move into the side strip** when folded.
+- **Keyboard splits around the fold in book pose.**
+- **Sheets never span the fold.**
+- **The simulator can't make the laptop pose.**
 
 ## The reasoning
 
@@ -75,7 +56,3 @@ Measured on the iPhone Duo simulator, iOS 27.1, and baked into the verdicts:
 | [Findings](docs/08-findings.md) | What the simulator taught us, with confidence levels |
 | [Lab backlog](docs/07-lab-backlog.md) | What's next, ranked |
 | [Facts](research/apple-foldable-facts.md) · [Tab bar facts](research/native-tabbar-liquid-glass-facts.md) · [Measurements](research/on-device-measurements.md) · [Checklist](CHECKLIST.md) | Sourced reference |
-
-## Capturing your own
-
-`demo/scripts/readme-shots.sh` re-takes every image above in both poses; `demo/scripts/capture.sh` shoots any topic or answer. Both fold the simulator for you. Notes on the simulator's quirks: [practices/simulator-capture.md](practices/simulator-capture.md).
