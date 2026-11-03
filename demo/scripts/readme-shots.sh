@@ -41,7 +41,7 @@ SHOT=(
   twopanes      "-topic twopanes -option split-drag"
   keyboard      "-topic keyboard -option composer-in-pane -duolab.focusComposer 1"
   transitions   "-topic transitions -option zoom"
-  camera        "-topic camera -option upright-preview-flat-controls -knob.simulatedPose laptop"
+  camera        "-topic camera -option book-side-controls"
   narrow        "-topic narrow -option adaptive"
   tour          "-tour 1 -tourStep 7 -tourPaused 1 -tourCompare 1"
   topic-page    "-topic grids"
